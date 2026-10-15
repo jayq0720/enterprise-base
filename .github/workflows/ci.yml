@@ -65,17 +65,11 @@ jobs:
 
   compose:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: compose 配置校验
-        # deploy/ 里还没有 compose 文件时跳过；有 .env.example 就拿来当变量
-        run: |
-          shopt -s nullglob
-          files=(deploy/docker-compose*.yml deploy/docker-compose*.yaml deploy/compose*.yml deploy/compose*.yaml)
-          if [ ${#files[@]} -eq 0 ]; then echo "deploy/ 下没有 compose 文件，跳过"; exit 0; fi
-          env_args=()
-          [ -f deploy/.env.example ] && env_args=(--env-file deploy/.env.example)
-          for f in "${files[@]}"; do
-            echo "校验 $f"
-            docker compose "${env_args[@]}" -f "$f" config --quiet
-          done
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.32"
+      - name: 完整部署隔离校验
+        run: make -C deploy verify
