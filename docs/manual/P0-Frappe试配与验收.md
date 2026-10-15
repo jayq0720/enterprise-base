@@ -53,7 +53,7 @@ fields=["name","department","designation","status"]
 
 在测试 UI 新建文档并发布、改正文、下架、重新发布、删除，再改变整个空间的发布状态及访问角色。使用官方 Webhook 或测试 App 的 doc_events 观察实际 DocType、事件、字段和投递次数，只使用纯测试内容。向 Claude 提供实际对象名、字段、前后状态、投递失败重试/重放行为和脱敏样例；不默认 X5 只监听旧 Wiki Page。下架、删文档、空间撤权都必须能让 X5 删除或禁用已同步内容；这部分消费逻辑仍由 Claude 独立服务实现。
 
-Wiki 定时遥测在该版本使用 `is_pulse_enabled()` 判断；部署中的关闭配置须在运行时核验，不能只看开关名称就宣称无外联。
+Wiki 定时遥测在该版本使用 `is_pulse_enabled()` 判断；Frappe 的 Pulse/PostHog 均读取 `System Settings.enable_telemetry`，不是同名 site_config 值。部署的 create-site 已改用官方 `frappe.client.set_value` 设置该字段为 0；试配时核对并将 System Settings 的该配置纳入导出范围。配置校验不能代替无外联的运行核验。依据：[Pulse](https://github.com/frappe/frappe/blob/v15.123.1/frappe/utils/telemetry/pulse/client.py)、[PostHog](https://github.com/frappe/frappe/blob/v15.123.1/frappe/utils/telemetry/posthog.py)。
 
 ## fixtures 与企业微信验收
 

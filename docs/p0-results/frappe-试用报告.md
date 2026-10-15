@@ -17,6 +17,8 @@
 
 给 Claude 的 X5 调查：固定版本的官方 hooks 对 Wiki Document、Wiki Space 注册 on_update/on_trash；发布状态字段、空间角色变化均可能影响同步范围。请勿在未实测前仅按旧 Wiki Page.published 设计同步。源码链接、测试步骤和需要采集的事件信息见手册。
 
+另修正部署初始化的遥测关闭位置：从 site_config 同名值改为通过官方接口写 System Settings.enable_telemetry=0。已核对固定版本读取源码并校验 Compose；数据库实际值与外联行为仍待运行验证。
+
 待补证据：实际安装版本；审批两路径截图及业务状态；API 白名单和拒绝测试摘要；Wiki 事件与重复/重试记录；企业微信身份相等结果；fixtures 导出文件及空库复现摘要。所有真实凭据和真实账号映射留在服务器。
 
 操作步骤：[`P0-Frappe试配与验收.md`](../manual/P0-Frappe试配与验收.md)。导出约定：[`config/frappe/p0/README.md`](../../config/frappe/p0/README.md)。执行人/日期/复核人及 JQ 的 Frappe 底座确认均待实际试用后填写；清单 5、6 节保持待验收。

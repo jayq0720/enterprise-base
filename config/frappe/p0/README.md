@@ -10,8 +10,9 @@
 - `Company/Department/Designation/Employee`：试配测试记录，以及实际必需的其他引用；真实员工数据不导出。
 - `Workflow/Workflow State/Workflow Action Master` 与使用的自定义角色、权限配置；审批自定义字段若有增加也一起导出。
 - 测试请假类型、必要的假期/额度等实际依赖；User Permission 等配置引用的测试用户需有可重复的安全前置创建步骤。
+- `System Settings` 的遥测关闭配置，确认实际数据库单例值为 0，不能用 site_config 中的同名项替代。
 
-不要导出真实用户、密码/哈希、API Secret、企业微信真实 userid、Token 或模型 Key。Employee 导出内容需人工复核并使用允许字段过滤；如果通用导出包含本任务禁止字段，应先在测试库确认这些字段为空并审查导出内容，不能直接整库复制。空库导入所需的测试用户/角色绑定应在运行流程中明确，不依赖作者机器已有账户。
+不要导出真实用户、密码/哈希、API Secret、企业微信真实 userid、Token 或模型 Key。导出内容需人工复核，不能直接整库复制；若原生导出包含禁止入库的内容，暂停提交，先确定官方支持的最小导出范围，不直接手改 JSON 冒充完整导出结果。空库导入所需的测试用户/角色绑定应在运行流程中明确，不依赖作者机器已有账户。
 
 官方导出命令的形态为 `bench --site <测试站点> export-fixtures --app enterprise_base`，原生输出位置是 App 的 `enterprise_base/fixtures/`。将原样导出副本及导出清单留在本目录，并保留 App 原生 fixtures 作为安装/迁移入口；不要假定 Frappe 自动扫描 `config/frappe/p0/`。复制仅用于归档，两处内容必须一致，任何改动都回到试配库重新导出。
 
