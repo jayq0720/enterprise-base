@@ -16,9 +16,9 @@
 
 | 约定 | 提供方 | 内容 |
 | --- | --- | --- |
-| Employee 自定义字段 `wecom_userid` | X2（Grok） | 通讯录同步时写入企业微信 userid，唯一 |
-| 白名单方法 `enterprise_base.duties.api.knowledge_spaces_for_designation` | X1（Gemini） | 参数 `designation`；返回 `[{"space": "公司制度", "dify_dataset_id": "..."}]`；只给本服务的 API 用户开权限 |
-| 文档元数据 `eb_scope` | X5（Gemini） | `,all,` 或 `,dept:<部门>,desig:<岗位>,`；部门、岗位名不能含英文逗号 |
+| Employee 自定义字段 `wecom_userid` | X2（GPT） | 通讯录同步时写入企业微信 userid，唯一 |
+| 白名单方法 `enterprise_base.duties.api.knowledge_spaces_for_designation` | X1（GPT） | 参数 `designation`；返回 `[{"space": "公司制度", "dify_dataset_id": "..."}]`；只给本服务的 API 用户开权限 |
+| 文档元数据 `eb_scope` | X5（Claude） | `,all,` 或 `,dept:<部门>,desig:<岗位>,`；部门、岗位名不能含英文逗号 |
 
 字段名和方法路径都可以用环境变量改，见 `.env.example`。
 
