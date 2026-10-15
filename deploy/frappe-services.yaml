@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mariadb:10.11.14
+    restart: unless-stopped
+    environment: {MARIADB_ROOT_PASSWORD: "${EB_FRAPPE_DB_PASSWORD}"}
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    volumes: ["db:/var/lib/mysql"]
+    healthcheck: {test: [CMD, healthcheck.sh, --connect, --innodb_initialized], interval: 5s, timeout: 5s, retries: 60}
+  redis-cache:
+    image: redis:6.2.20-alpine
+    restart: unless-stopped
+    volumes: ["cache:/data"]
+    healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 5s, retries: 30}
+  redis-queue:
+    image: redis:6.2.20-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes"]
+    volumes: ["queue:/data"]
+    healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 5s, retries: 30}
+  create-site:
+    image: enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0
+    pull_policy: never
+    platform: linux/amd64
+    profiles: [bootstrap]
+    volumes: ["sites:/home/frappe/frappe-bench/sites", "logs:/home/frappe/frappe-bench/logs"]
+    environment:
+      SITE: hr.${EB_DOMAIN}
+      SITE_URL: ${EB_SCHEME}://hr.${EB_DOMAIN}
+      DB_ROOT_PASSWORD: ${EB_FRAPPE_DB_PASSWORD}
+      ADMIN_PASSWORD: ${EB_FRAPPE_ADMIN_PASSWORD}
+    entrypoint: [bash, -ec]
+    command:
+      - >-
+        test -f "sites/$$SITE/site_config.json" || bench new-site "$$SITE" --db-root-username root --db-root-password "$$DB_ROOT_PASSWORD" --admin-password "$$ADMIN_PASSWORD" --mariadb-user-host-login-scope '%';
+        for app in erpnext hrms wiki; do bench --site "$$SITE" install-app "$$app"; done;
+        bench --site "$$SITE" set-config host_name "$$SITE_URL";
+        bench --site "$$SITE" set-config enable_telemetry 0;
+        bench --site "$$SITE" enable-scheduler

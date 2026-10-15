@@ -1,0 +1,12 @@
+{$DIFY_ADDRESS} {
+    reverse_proxy dify:80
+}
+{$HR_ADDRESS} {
+    reverse_proxy frappe:8080
+}
+{$WECOM_ADDRESS} {
+    handle /wxcomapp* {
+        reverse_proxy wechat:9898
+    }
+    respond 404
+}

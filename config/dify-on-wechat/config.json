@@ -1,0 +1,1 @@
+{"model":"dify","channel_type":"wechatcom_app","dify_api_base":"http://dify/v1","dify_app_type":"chatbot","wechatcomapp_port":9898,"appdata_dir":"data","debug":false,"single_chat_prefix":[""],"single_chat_reply_prefix":"","image_create_prefix":[],"image_recognition":false,"speech_recognition":false,"voice_reply_voice":false}
