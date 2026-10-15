@@ -9,7 +9,7 @@ services:
       HR_ADDRESS: ${EB_SCHEME:-http}://hr.${EB_DOMAIN:-localhost}
       WECOM_ADDRESS: ${EB_SCHEME:-http}://wecom.${EB_DOMAIN:-localhost}
       EB_ADMIN_ALLOW_CIDRS: ${EB_ADMIN_ALLOW_CIDRS:-127.0.0.1/32}
-    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+    volumes: ["./data/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
     networks: [edge]
   wechat:
     image: hanfangyuan/dify-on-wechat@sha256:2ef2ecf9f081301fd34f9ceb4397f1d6cd6dac2eb42789285970a6f31752ad76

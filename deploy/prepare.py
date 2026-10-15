@@ -78,6 +78,12 @@ if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", settings["EB_PROJECT"]) or not re.fu
 if settings["EB_SCHEME"] not in {"http", "https"}:
     sys.exit("EB_SCHEME 仅允许 http 或 https。")
 Path("secrets").mkdir(exist_ok=True, mode=0o700)
+Path("data").mkdir(exist_ok=True)
+caddyfile = Path("Caddyfile").read_text()
+# 仅精确绑定 IPv4 回环时由宿主机端口隔离；其它绑定保持来源限制。
+if (settings.get("EB_BIND") or "127.0.0.1") == "127.0.0.1":
+    caddyfile = caddyfile.replace("        import admin_only\n", "")
+write("data/Caddyfile", caddyfile)
 project = settings["EB_PROJECT"]
 edge = {"external": True, "name": f"{project}_edge"}
 dify, frappe = source("dify") / "docker", source("frappe")

@@ -1,6 +1,6 @@
 # P0 本地部署与交接
 
-目标：镜像准备好后 30 分钟内可登录；首次下载、Frappe 冷构建耗时另计，尚待 JQ 实测。建议 Linux amd64、4 核、16 GB 内存、60 GB 可用磁盘；安装 Docker Engine、Compose ≥2.24、Git、make、uv。macOS/ARM 需要 amd64 仿真，不能据此承诺耗时。域名和凭据只在服务器配置。
+目标：镜像准备好后 30 分钟内可登录；首次下载、Frappe 冷构建耗时另计，尚待 JQ 实测。建议 Linux amd64、4 核、16 GB 内存、60 GB 可用磁盘；安装 Docker Engine ≥28、Compose ≥2.24、Git、make、uv。macOS/ARM 需要 amd64 仿真，不能据此承诺耗时。域名和凭据只在服务器配置。
 
 ## 启动
 在已合并部署代码的仓库根目录执行。
@@ -14,6 +14,8 @@ make status
 `make init` 自动生成随机密钥，重复执行保留原值；所有密钥文件权限 600。环境文件仅支持 `KEY=单行值`，不写引号或变量展开。`make up` 首次用官方 frappe_docker 构建 HR 镜像；`make build` 可提前构建。构建失败可重试，勿删除数据卷。只有 HRMS、Wiki 作为附加功能安装；ERPNext 是 HRMS 官方必需依赖。
 
 浏览器打开 `http://dify.localhost/install` 创建管理员，打开 `http://hr.localhost` 用 `Administrator` 和服务器 `secrets/.env` 中的 `EB_FRAPPE_ADMIN_PASSWORD` 登录。若系统不解析子域名，将 `dify.localhost hr.localhost wecom.localhost` 加入 hosts，指向 `127.0.0.1`。Frappe 的公司向导先用测试公司，真实组织配置在 G3/G4 导出 fixtures。
+
+`make prepare` 从仓库 `Caddyfile` 模板生成 `data/Caddyfile`，Compose 只读挂载生成文件。仅当实际端口绑定为 `127.0.0.1` 时移除 Dify/HR 的 `import admin_only`，依靠宿主机回环端口隔离；此时 Docker 将来源改写成网桥网关也能完成本机初始化。其他绑定一律启用白名单，包括内网地址和 IPv6 回环。不要把网桥网关加入白名单。每次改 `EB_BIND` 都通过 `make up` 重新生成、重建入口，不直接复用旧生成文件；`data/` 不提交。
 
 ## 旧测试环境修复（PR #9 发现的启动问题）
 
@@ -39,7 +41,7 @@ make up
 make status
 ```
 
-不删除 `data/`、命名卷或其它密钥。`make up` 重新生成配置、拉取固定摘要的 Debian Nginx；全局日志保持 `WARNING`，仅插件守护进程用 `WARN`，不要在环境文件把全局改成 `WARN`。站点已经创建时仍会重试应用安装、遥测设置和调度器开启；遥测使用数据库 Single 接口，避免未完成公司向导时触发必填校验。步骤依据 [Claude 实测记录](../docs/p0-results/P0-本地实测-Claude.md)，修复后的完整启动仍需在 Docker 环境复测。
+不删除 `data/`、命名卷或其它密钥。`make up` 重新生成配置、拉取固定摘要的 Debian Nginx；全局日志保持 `WARNING`，仅插件守护进程用 `WARN`，不要在环境文件把全局改成 `WARN`。站点已经创建时仍会重试应用安装、遥测设置和调度器开启；遥测使用数据库 Single 接口，避免未完成公司向导时触发必填校验。步骤依据 [Claude 实测记录](../docs/p0-results/P0-本地实测-Claude.md)。JQ 转交的 2026-10-15 晚复核确认：四项启动修复在 main e686aa1 从零初始化成功，用时 5 分钟（镜像已缓存）；本次回环入口修复仍须单独进行 Docker 回归。
 
 ## 企业微信入口
 在 Dify 后台创建 Chatflow，API Key 只填进服务器 `secrets/.env` 的 `DIFY_API_KEY`；填写该文件所有 `WECHAT*` 项，AES Key 为企业微信后台给出的 43 位值，Agent ID 用纯数字。然后：
@@ -48,9 +50,11 @@ make wechat
 ```
 企业微信后台回调路径为 `/wxcomapp`。真实回调需要公网 HTTPS 域名和可信 IP；先在本机完成两个管理员初始化，再把 `EB_DOMAIN` 改成客户域名、`EB_SCHEME=https`、`EB_BIND=0.0.0.0`，并在服务器 `.env` 的 `EB_ADMIN_ALLOW_CIDRS` 填管理员固定出口 IP/CIDR，配置三个子域名 DNS，开放 80/443，重新 `make up`。Caddy 自动签发证书，配置客户域名前先确认站点数据是可丢弃的测试环境；域名变化会创建新的 Frappe 站点。公网测试域名、备案要求由 JQ 确认（清单 6.2）。
 
-`EB_ADMIN_ALLOW_CIDRS` 默认 `127.0.0.1/32`，多个条目用空格分隔，支持 IPv4/IPv6，不加引号；空值、无效 CIDR 和全网 `/0` 拒绝启动。旧 `.env` 没有此键时仍回退到本机白名单，`make init` 不覆盖已有文件，需管理员自行补值。Dify 所有路径（包括 `/v1/*`）及 HR 的 `/login`、REST、后台均受限制，未授权来源返回 403；企业微信 `/wxcomapp` 不受此白名单限制，仍由应用校验签名。X3/X4/dify-on-wechat 走内网 `dify` 别名，不受公网入口限制；外部 Service API 和员工扫码登录须在后续独立评审后按需开放路径，不先开放整站。
+`EB_ADMIN_ALLOW_CIDRS` 默认 `127.0.0.1/32`，多个条目用空格分隔，支持 IPv4/IPv6，不加引号；空值、无效 CIDR 和全网 `/0` 拒绝启动。本机模式不使用该值判断来源。旧 `.env` 没有此键时仍用默认值，`make init` 不覆盖已有文件，转为对外绑定前需填管理员真实出口。对外绑定时，Dify 所有路径（包括 `/v1/*`）及 HR 的 `/login`、REST、后台均受限制，未授权来源返回 403；企业微信 `/wxcomapp` 不受此白名单限制，仍由应用校验签名。X3/X4/dify-on-wechat 走内网 `dify` 别名，不受公网入口限制；外部 Service API 和员工扫码登录须在后续独立评审后按需开放路径，不先开放整站。
 
 来源判断使用连接对端 `remote_ip`，不信任客户端的 `X-Forwarded-For`/`Forwarded`。当前方案按直连入口设计；CDN、负载均衡或 Docker Desktop NAT 可能改变对端地址，应先核实实际来源，不能将所有访客共享的代理地址直接列为可信管理员来源。官方行为见 [Caddy remote_ip](https://caddyserver.com/docs/caddyfile/matchers#remote-ip)。
+
+上线前按 [后台入口实测](ADMIN-ACCESS.md) 从白名单内外分别访问，核对 Caddy 实际来源，IPv4/IPv6 分别记录。原生 Caddy 回环检查不经过 Docker 转发，不能替代此验收。回环隔离需 Docker Engine ≥28、默认 bridge/NAT 且未开启容器直路由；旧版的同网段访问问题见 [Docker 官方说明](https://docs.docker.com/engine/network/port-publishing/)。
 
 上游企业微信渠道会打印凭据和消息，因此部署将 stdout/stderr 与 `/app/run.log` 丢弃，Docker 日志驱动设为 `none`；不要临时开启原始日志。附带聊天插件全部禁用，避免切换模型或读取额外数据。故障只反馈容器状态和 HTTP 状态码。启动入口不等于收发已通过：需以测试员工发消息，检查 Chatflow 的 `sys.user_id` 与该员工企业微信 userid 一致，记录“相等/不相等”，不要粘贴真实 userid、Key 或完整运行记录。
 
