@@ -1,8 +1,8 @@
-# 任务卡 P0-R3：CI 骨架
+# 任务卡 P0-C5：CI 骨架
 
-- 负责：Grok　审核：Claude
+- 负责：Claude　复看：GPT
 - 时间：10-15 – 10-21
-- 分支：`grok/P0-R3-ci`
+- 分支：`claude/P0-C5-ci`
 
 ## 要做的事
 
@@ -16,9 +16,9 @@
 
 ## 交付
 
-PR 包含 workflow 和一段说明（写在 `deploy/CI.md`）。附一次 CI 运行链接。
+PR 包含 workflow 和一段说明（写在 `docs/CI.md`）。附一次 CI 运行链接。
 
 ## 验收
 
 - 故意提交一个假密钥的测试分支，CI 失败。
-- Claude 的 X3 骨架 PR（`claude/P0-C2-kb-gateway-skeleton`）在 CI 里全绿。
+- X3 骨架（PR #1）在 CI 里全绿。
