@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     dify_dataset_api_key: SecretStr
     # 文档元数据里记录可见范围的字段（由 X5 写入）
     scope_metadata_field: str = "eb_scope"
+    # 检索方式：知识库用高质量索引时 hybrid_search；经济索引只支持 keyword_search
+    dify_search_method: str = "hybrid_search"
 
     top_k_max: int = Field(default=10, ge=1, le=50)
     http_timeout_seconds: float = 5.0
