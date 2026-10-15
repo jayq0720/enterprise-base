@@ -177,7 +177,9 @@ def validate(work):
               ("dify", "secrets/dify.env", "data/dify/docker/eb-compose.yaml", None),
               ("frappe", "secrets/.env", "data/frappe/eb-compose.yaml", "bootstrap"))
     for project, domain, scheme, bind, cidrs in (("eb", "localhost", "http", "127.0.0.1", "127.0.0.1/32"),
-            ("eb-ci-review", "example.invalid", "https", "0.0.0.0", "203.0.113.0/24 2001:db8::/64")):
+            ("eb-ci-review", "example.invalid", "https", "0.0.0.0", "203.0.113.0/24 2001:db8::/64"),
+            ("eb-local-recheck", "localhost", "http", "127.0.0.1", "203.0.113.0/24"),
+            ("eb-public-allow", "example.invalid", "https", "0.0.0.0", "127.0.0.1/32")):
         values.update(EB_PROJECT=project, EB_DOMAIN=domain, EB_SCHEME=scheme, EB_BIND=bind, EB_ADMIN_ALLOW_CIDRS=cidrs)
         private.write_text("".join(f"{k}={v}\n" for k, v in values.items()))
         output += prepare("secrets/.env")
@@ -198,15 +200,19 @@ def validate(work):
                         "域名/协议未正确传递到入口。")
                 require(all(p["host_ip"] == bind for p in caddy["ports"]), "入口绑定地址未正确传递。")
                 require(caddy["environment"]["EB_ADMIN_ALLOW_CIDRS"] == cidrs, "管理员白名单未正确传递。")
-                verify_access(work, caddy["environment"])
-                unguarded = (work / "Caddyfile").read_text().replace("import admin_only", "")
+                require(any(Path(m["source"]).resolve() == (work / "data/Caddyfile").resolve() and m["target"] == "/etc/caddy/Caddyfile"
+                            and m.get("read_only") for m in caddy["volumes"]), "入口未挂载生成的 Caddy 配置。")
+                verify_access(work, caddy["environment"], bind)
+                generated = (work / "data/Caddyfile").read_text()
+                incorrect = ((work / "Caddyfile").read_text() if bind == "127.0.0.1"
+                             else generated.replace("import admin_only", ""))
                 try:
-                    verify_access(work, caddy["environment"], unguarded, run_probe=False)
+                    verify_access(work, caddy["environment"], bind, incorrect, run_probe=False)
                 except RuntimeError:
                     pass
                 else:
-                    raise RuntimeError("删除后台来源限制后未被拒绝。")
-                print(f"{project}/caddy：后台允许/403、伪造头拒绝、回调边界及删除限制反例通过。")
+                    raise RuntimeError("本机误设限制或对外遗漏限制的反例未被拒绝。")
+                print(f"{project}/caddy：本机免限制/对外白名单、伪造头、回调边界及错误配置反例通过。")
                 require(wechat["logging"]["driver"] == "none" and ">/dev/null 2>&1" in wechat["entrypoint"][-1],
                         "企业微信输出未关闭。")
                 require(any(m["source"] == "/dev/null" and m["target"] == "/app/run.log"

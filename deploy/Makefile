@@ -22,7 +22,7 @@ build: prepare
 up: config
 	$(RUN) check $(ENV)
 	$(DOCKER) image inspect enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0 >/dev/null 2>&1 || $(MAKE) build
-	$(EDGE) up -d caddy
+	$(EDGE) up -d --force-recreate caddy
 	$(DIFY) up -d --wait --wait-timeout 600
 	$(HR) up -d --wait --wait-timeout 600
 	$(HR) run --rm create-site

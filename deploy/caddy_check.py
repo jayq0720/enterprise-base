@@ -54,23 +54,25 @@ def flatten(routes):
             yield route
 
 
-def check_routes(config, environment):
+def check_routes(config, environment, bind):
     routes = [r for s in config["apps"]["http"]["servers"].values() for r in s["routes"]]
     for key, upstream in (("DIFY_ADDRESS", "dify:80"), ("HR_ADDRESS", "frappe:8080")):
         host = urlsplit(environment[key]).hostname
         sites = [r for r in routes if r.get("match") == [{"host": [host]}]]
         need(len(sites) == 1 and len(sites[0]["handle"]) == 1)
         chain = list(flatten(sites[0]["handle"][0]["routes"]))
-        need(len(chain) == 2)
-        deny, proxy = chain
-        need(deny.get("match") == [{"not": [{"remote_ip": {"ranges": environment["EB_ADMIN_ALLOW_CIDRS"].split()}}]}])
-        need(deny["handle"] == [{"handler": "static_response", "status_code": 403}])
+        need(len(chain) == (1 if bind == "127.0.0.1" else 2))
+        if bind != "127.0.0.1":
+            deny = chain[0]
+            need(deny.get("match") == [{"not": [{"remote_ip": {"ranges": environment["EB_ADMIN_ALLOW_CIDRS"].split()}}]}])
+            need(deny["handle"] == [{"handler": "static_response", "status_code": 403}])
+        proxy = chain[-1]
         need(not proxy.get("match") and proxy["handle"][0]["handler"] == "reverse_proxy")
         need(proxy["handle"][0]["upstreams"] == [{"dial": upstream}])
     return routes
 
 
-def probe(binary, routes, environment, work):
+def probe(binary, routes, environment, work, bind):
     def replace_backend(node):
         if isinstance(node, dict):
             if node.get("handler") == "reverse_proxy":
@@ -120,8 +122,8 @@ def probe(binary, routes, environment, work):
             except OSError:
                 time.sleep(0.1)
         need(ready)
-        allowed = any(ipaddress.ip_address("127.0.0.1") in ipaddress.ip_network(cidr)
-                      for cidr in environment["EB_ADMIN_ALLOW_CIDRS"].split())
+        allowed = bind == "127.0.0.1" or any(ipaddress.ip_address("127.0.0.1") in ipaddress.ip_network(cidr)
+                                            for cidr in environment["EB_ADMIN_ALLOW_CIDRS"].split())
         for key, paths in (("DIFY_ADDRESS", ("/", "/install", "/console/api/setup", "/v1/chat-messages")),
                            ("HR_ADDRESS", ("/", "/login", "/api/resource/Employee"))):
             for route in paths:
@@ -138,14 +140,14 @@ def probe(binary, routes, environment, work):
             process.wait()
 
 
-def verify_access(work, environment, text=None, run_probe=True):
+def verify_access(work, environment, bind, text=None, run_probe=True):
     binary = binary_for(work)
     path = work / "caddy-adapt.Caddyfile"
-    path.write_text((work / "Caddyfile").read_text() if text is None else text)
+    path.write_text((work / "data/Caddyfile").read_text() if text is None else text)
     result = subprocess.run([binary, "adapt", "--config", str(path), "--adapter", "caddyfile"],
                             env={**os.environ, **environment}, capture_output=True, text=True)
     need(result.returncode == 0)
     config = json.loads(result.stdout)
-    routes = check_routes(config, environment)
+    routes = check_routes(config, environment, bind)
     if run_probe:
-        probe(binary, routes, environment, work)
+        probe(binary, routes, environment, work, bind)

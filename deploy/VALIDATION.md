@@ -6,10 +6,10 @@
 
 自动检查范围：
 
-- 默认 localhost/HTTP 与自定义测试域名/HTTPS，两组完整入口、Dify、Frappe Compose。
+- 本机默认、本机白名单不含回环、对外拒绝、对外允许四组完整入口/Dify/Frappe Compose，并往返切换绑定模式，检查生成文件不残留上次策略。
 - 镜像为具体语义版本或 SHA256 摘要；数据卷有名字，sandbox 配置绑定只读。
 - 只有 Caddy 公开端口，默认仅本机监听；Sandbox 保持隔离网络，Frappe 后端不直接接入入口网络。
-- 公网绑定 `EB_BIND=0.0.0.0` 时，用 Caddy 实际解析路由，确认 Dify/HR 代理前均有 remote_ip 白名单及 403 拒绝，`/v1/*` 不例外；删除限制的反例必须失败。
+- 检查 Compose 实际只读挂载 `data/Caddyfile`，用 Caddy 解析生成文件：精确绑定 `127.0.0.1` 时后台无来源限制；其他绑定必须有 remote_ip 白名单及 403 拒绝，`/v1/*` 不例外。本机误留限制、对外删除限制的反例均须失败。
 - Caddy 在随机 127.0.0.1 端口短暂运行，后端替换为固定测试响应，验证允许/拒绝、伪造转发头不能绕过、企业微信回调入口不误封；不连接 Dify/Frappe/企业微信。验证结束即停止该测试进程。
 - 项目名、域名、Qdrant 选择及 Sandbox 共享密钥正确传递。
 - Debian Nginx 的已核验摘要；插件守护进程 `WARN` 与 API/Celery `WARNING`；Agent 密钥解码后为 32 字节无填充 base64url。回退 Alpine、两种错误日志级别或旧 64 位密钥的反例必须失败。
@@ -22,5 +22,7 @@
 只有独立 Compose 程序而没有 `docker` 命令时，可设置 `EB_COMPOSE_COMMAND=/绝对路径/docker-compose` 后运行；默认使用 `docker compose`。
 
 已有官方 Caddy 2.10.2 可设置 `EB_CADDY_BINARY=/绝对路径/caddy`；其它版本拒绝，未指定则在临时目录下载已锁定摘要的官方程序。验证平台支持 Linux/macOS 的 amd64/arm64。
+
+原生 Caddy 探测不经过 Docker 的 userland-proxy/NAT，也没有验证真实 IPv6 客户端。上线前仍须按 [ADMIN-ACCESS.md](ADMIN-ACCESS.md) 实测本机初始化、远端允许/403 和 Caddy 来源 IP；不能因配置校验通过就将公网来源校验记为通过。
 
 不覆盖的验收：镜像构建、登录、30 分钟目标、重启保留数据、权限接口的运行拒绝、fixtures 空库导入、真实企业微信或模型调用。JQ 已安排这些测试在服务器准备后完成，不能根据本校验勾选它们。
