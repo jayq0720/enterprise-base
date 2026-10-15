@@ -3,7 +3,7 @@
 目标：镜像准备好后 30 分钟内可登录；首次下载、Frappe 冷构建耗时另计，尚待 JQ 实测。建议 Linux amd64、4 核、16 GB 内存、60 GB 可用磁盘；安装 Docker Engine、Compose ≥2.24、Git、make、uv。macOS/ARM 需要 amd64 仿真，不能据此承诺耗时。域名和凭据只在服务器配置。
 
 ## 启动
-在仓库根目录执行；当前任务分支是 `gpt/P0-G1-compose`。
+在已合并部署代码的仓库根目录执行。
 ```sh
 cd deploy
 make init
@@ -39,4 +39,4 @@ make status
 三套 Compose 的项目名分别是 `${EB_PROJECT}`、`${EB_PROJECT}-dify`、`${EB_PROJECT}-hr`，数据库/向量/附件/队列/证书均用命名卷；sandbox conf 是只读配置挂载。`deploy/data/` 是可重新生成的上游配置，`deploy/secrets/` 需随备份加密保存；正常重启不修改项目名，不运行 `down -v`。本任务不包含自动备份或升级，升级时先备份数据库、文件卷和密钥，固定新版本，在独立测试项目完整验证后再迁移。
 
 ## 当前验证边界
-开发环境没有 Docker Engine 和服务器凭据，仅运行官方 Compose 2.39.4 的配置校验；镜像构建、干净机器 30 分钟目标、登录、持久化、真实企业微信回调均等待上述服务器实测。现有 CI 自动检查入口 Compose 与密钥；完整三套的检查命令为 `make config`。G1 通过后按 G2 验证三个官方模型插件，再按 G3/G4 配置组织、审批与 `wecom_userid` 并导出 fixtures；结果不能用配置校验替代。
+开发环境没有 Docker Engine 和服务器凭据，仅运行官方 Compose 2.39.4 的配置校验；镜像构建、干净机器 30 分钟目标、登录、持久化、真实企业微信回调均等待上述服务器实测。CI 自动运行 `make verify`，在临时目录检查完整三套配置及部署约束，不读取或覆盖已有运行密钥；`make config` 用于检查当前实际部署配置。G1 通过后按 G2 验证三个官方模型插件，再按 G3/G4 配置组织、审批与 `wecom_userid` 并导出 fixtures；结果不能用配置校验替代。
