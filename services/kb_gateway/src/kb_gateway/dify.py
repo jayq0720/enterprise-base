@@ -25,6 +25,7 @@ class DifyKnowledge:
         self._base = str(settings.dify_api_base).rstrip("/")
         key = settings.dify_dataset_api_key.get_secret_value()
         self._headers = {"Authorization": f"Bearer {key}"}
+        self._search_method = settings.dify_search_method
 
     async def retrieve(
         self, dataset_id: str, query: str, top_k: int, conditions: dict[str, object]
@@ -32,7 +33,7 @@ class DifyKnowledge:
         body = {
             "query": query,
             "retrieval_model": {
-                "search_method": "hybrid_search",
+                "search_method": self._search_method,
                 "reranking_enable": False,
                 "top_k": top_k,
                 "score_threshold_enabled": False,

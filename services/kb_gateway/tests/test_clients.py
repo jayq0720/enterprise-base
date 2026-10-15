@@ -48,3 +48,16 @@ async def test_dify_retrieve_parses_records(settings: Settings) -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
         out = await DifyKnowledge(settings, c).retrieve("ds-hr", "q", 3, {"x": 1})
     assert out[0].title == "考勤制度" and out[0].metadata == {"eb_scope": ",all,"}
+
+
+async def test_dify_search_method_configurable(settings: Settings) -> None:
+    # 经济索引的知识库只支持 keyword_search（P0 实测 hybrid_search 返回 400）
+    settings.dify_search_method = "keyword_search"
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
+        assert body["retrieval_model"]["search_method"] == "keyword_search"
+        return httpx.Response(200, json={"records": []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+        assert await DifyKnowledge(settings, c).retrieve("ds-hr", "q", 3, {}) == []
