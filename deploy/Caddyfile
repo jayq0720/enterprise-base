@@ -1,8 +1,18 @@
+(admin_only) {
+    @denied not remote_ip {$EB_ADMIN_ALLOW_CIDRS:127.0.0.1/32}
+    respond @denied 403
+}
 {$DIFY_ADDRESS} {
-    reverse_proxy dify:80
+    route {
+        import admin_only
+        reverse_proxy dify:80
+    }
 }
 {$HR_ADDRESS} {
-    reverse_proxy frappe:8080
+    route {
+        import admin_only
+        reverse_proxy frappe:8080
+    }
 }
 {$WECOM_ADDRESS} {
     handle /wxcomapp* {

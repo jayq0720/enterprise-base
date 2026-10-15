@@ -46,7 +46,11 @@ make status
 ```sh
 make wechat
 ```
-企业微信后台回调路径为 `/wxcomapp`。真实回调需要公网 HTTPS 域名和可信 IP；先在本机完成两个管理员初始化，再把 `EB_DOMAIN` 改成客户域名、`EB_SCHEME=https`、`EB_BIND=0.0.0.0`，配置三个子域名 DNS，并开放 80/443，重新 `make up`。Caddy 自动签发证书，配置客户域名前先确认站点数据是可丢弃的测试环境；域名变化会创建新的 Frappe 站点。公网测试域名、备案要求由 JQ 确认（清单 6.2）。
+企业微信后台回调路径为 `/wxcomapp`。真实回调需要公网 HTTPS 域名和可信 IP；先在本机完成两个管理员初始化，再把 `EB_DOMAIN` 改成客户域名、`EB_SCHEME=https`、`EB_BIND=0.0.0.0`，并在服务器 `.env` 的 `EB_ADMIN_ALLOW_CIDRS` 填管理员固定出口 IP/CIDR，配置三个子域名 DNS，开放 80/443，重新 `make up`。Caddy 自动签发证书，配置客户域名前先确认站点数据是可丢弃的测试环境；域名变化会创建新的 Frappe 站点。公网测试域名、备案要求由 JQ 确认（清单 6.2）。
+
+`EB_ADMIN_ALLOW_CIDRS` 默认 `127.0.0.1/32`，多个条目用空格分隔，支持 IPv4/IPv6，不加引号；空值、无效 CIDR 和全网 `/0` 拒绝启动。旧 `.env` 没有此键时仍回退到本机白名单，`make init` 不覆盖已有文件，需管理员自行补值。Dify 所有路径（包括 `/v1/*`）及 HR 的 `/login`、REST、后台均受限制，未授权来源返回 403；企业微信 `/wxcomapp` 不受此白名单限制，仍由应用校验签名。X3/X4/dify-on-wechat 走内网 `dify` 别名，不受公网入口限制；外部 Service API 和员工扫码登录须在后续独立评审后按需开放路径，不先开放整站。
+
+来源判断使用连接对端 `remote_ip`，不信任客户端的 `X-Forwarded-For`/`Forwarded`。当前方案按直连入口设计；CDN、负载均衡或 Docker Desktop NAT 可能改变对端地址，应先核实实际来源，不能将所有访客共享的代理地址直接列为可信管理员来源。官方行为见 [Caddy remote_ip](https://caddyserver.com/docs/caddyfile/matchers#remote-ip)。
 
 上游企业微信渠道会打印凭据和消息，因此部署将 stdout/stderr 与 `/app/run.log` 丢弃，Docker 日志驱动设为 `none`；不要临时开启原始日志。附带聊天插件全部禁用，避免切换模型或读取额外数据。故障只反馈容器状态和 HTTP 状态码。启动入口不等于收发已通过：需以测试员工发消息，检查 Chatflow 的 `sys.user_id` 与该员工企业微信 userid 一致，记录“相等/不相等”，不要粘贴真实 userid、Key 或完整运行记录。
 
@@ -65,4 +69,4 @@ make status
 三套 Compose 的项目名分别是 `${EB_PROJECT}`、`${EB_PROJECT}-dify`、`${EB_PROJECT}-hr`，数据库/向量/附件/队列/证书均用命名卷；sandbox conf 是只读配置挂载。`deploy/data/` 是可重新生成的上游配置，`deploy/secrets/` 需随备份加密保存；正常重启不修改项目名，不运行 `down -v`。本任务不包含自动备份或升级，升级时先备份数据库、文件卷和密钥，固定新版本，在独立测试项目完整验证后再迁移。
 
 ## 当前验证边界
-开发环境没有 Docker Engine 和服务器凭据，仅运行官方 Compose 2.39.4 的配置校验；镜像构建、干净机器 30 分钟目标、登录、持久化、真实企业微信回调均等待上述服务器实测。CI 自动运行 `make verify`，在临时目录检查完整三套配置及部署约束，不读取或覆盖已有运行密钥；`make config` 用于检查当前实际部署配置。G1 通过后按 G2 验证三个官方模型插件，再按 G3/G4 配置组织、审批与 `wecom_userid` 并导出 fixtures；结果不能用配置校验替代。
+开发环境没有 Docker Engine 和服务器凭据；镜像构建、干净机器 30 分钟目标、登录、持久化、真实企业微信回调均等待上述服务器实测。CI 自动运行 `make verify`，在临时目录检查完整三套配置及部署约束，并用固定版 Caddy 在随机回环端口短暂验证允许/403/伪造请求头行为，测试后端仅返回固定响应，不访问业务服务。校验不读取或覆盖已有运行密钥；`make config` 用于检查当前实际部署配置。G1 通过后按 G2 验证三个官方模型插件，再按 G3/G4 配置组织、审批与 `wecom_userid` 并导出 fixtures；结果不能用这些检查替代。

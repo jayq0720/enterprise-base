@@ -11,9 +11,11 @@ import subprocess
 import sys
 import tempfile
 
+from caddy_check import verify_access
+
 ROOT = Path(__file__).resolve().parent
 COMPOSE = shlex.split(os.environ.get("EB_COMPOSE_COMMAND", "docker compose"))
-FILES = ("prepare.py", ".env.example", "upstream.lock.json", "apps.lock.json",
+FILES = ("prepare.py", ".env.example", "upstream.lock.json", "apps.lock.json", "caddy.lock.json",
          "docker-compose.yml", "frappe-services.yaml", "Caddyfile")
 
 
@@ -159,16 +161,24 @@ def validate(work):
     prepare("wechat", "secrets/.env", success=False)
     # 缺失整个配置项也必须拒绝，不能只检查已有键。
     incomplete = work / "secrets/incomplete.env"
-    incomplete.write_text("\n".join(f"{k}=synthetic-test-value" for k in values
-                                     if k != "WECHATCOMAPP_TOKEN") + "\n")
+    incomplete.write_text("\n".join(f"{k}={'synthetic-test-value' if k.startswith('WECHAT') or k == 'DIFY_API_KEY' else v}"
+                                     for k, v in values.items()) + "\n")
+    prepare("wechat", str(incomplete))
+    incomplete.write_text("\n".join(line for line in incomplete.read_text().splitlines()
+                                     if not line.startswith("WECHATCOMAPP_TOKEN=")) + "\n")
     prepare("wechat", str(incomplete), success=False)
+    for cidrs in ("", "not-a-cidr", "0.0.0.0/0", "::/0"):
+        incomplete.write_text("".join(f"{k}={cidrs if k == 'EB_ADMIN_ALLOW_CIDRS' else v}\n" for k, v in values.items()))
+        prepare("check", str(incomplete), success=False)
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in values.items() if k != "EB_ADMIN_ALLOW_CIDRS"))
+    prepare("check", str(incomplete))
     incomplete.unlink()
     stacks = (("edge", "secrets/.env", "docker-compose.yml", "wechat"),
               ("dify", "secrets/dify.env", "data/dify/docker/eb-compose.yaml", None),
               ("frappe", "secrets/.env", "data/frappe/eb-compose.yaml", "bootstrap"))
-    for project, domain, scheme in (("eb", "localhost", "http"),
-                                    ("eb-ci-review", "example.invalid", "https")):
-        values.update(EB_PROJECT=project, EB_DOMAIN=domain, EB_SCHEME=scheme)
+    for project, domain, scheme, bind, cidrs in (("eb", "localhost", "http", "127.0.0.1", "127.0.0.1/32"),
+            ("eb-ci-review", "example.invalid", "https", "0.0.0.0", "203.0.113.0/24 2001:db8::/64")):
+        values.update(EB_PROJECT=project, EB_DOMAIN=domain, EB_SCHEME=scheme, EB_BIND=bind, EB_ADMIN_ALLOW_CIDRS=cidrs)
         private.write_text("".join(f"{k}={v}\n" for k, v in values.items()))
         output += prepare("secrets/.env")
         for stack, environment, file, profile in stacks:
@@ -186,7 +196,17 @@ def validate(work):
                 caddy, wechat = services["caddy"], services["wechat"]
                 require(caddy["environment"]["DIFY_ADDRESS"] == f"{scheme}://dify.{domain}",
                         "域名/协议未正确传递到入口。")
-                require(all(p["host_ip"] == "127.0.0.1" for p in caddy["ports"]), "默认入口不再仅监听本机。")
+                require(all(p["host_ip"] == bind for p in caddy["ports"]), "入口绑定地址未正确传递。")
+                require(caddy["environment"]["EB_ADMIN_ALLOW_CIDRS"] == cidrs, "管理员白名单未正确传递。")
+                verify_access(work, caddy["environment"])
+                unguarded = (work / "Caddyfile").read_text().replace("import admin_only", "")
+                try:
+                    verify_access(work, caddy["environment"], unguarded, run_probe=False)
+                except RuntimeError:
+                    pass
+                else:
+                    raise RuntimeError("删除后台来源限制后未被拒绝。")
+                print(f"{project}/caddy：后台允许/403、伪造头拒绝、回调边界及删除限制反例通过。")
                 require(wechat["logging"]["driver"] == "none" and ">/dev/null 2>&1" in wechat["entrypoint"][-1],
                         "企业微信输出未关闭。")
                 require(any(m["source"] == "/dev/null" and m["target"] == "/app/run.log"
@@ -212,7 +232,7 @@ def validate(work):
     require(all(values[k] not in output for k in secret_keys), "初始化或生成输出包含密钥。")
     require(all(f.stat().st_mode & 0o777 == 0o600 for f in (work / "secrets").iterdir()), "密钥文件权限不是 600。")
     require((work / "secrets").stat().st_mode & 0o777 == 0o700, "密钥目录权限不是 700。")
-    print("初始化幂等、密钥权限与缺项拒绝通过；三类配置反例均被拒绝。")
+    print("初始化幂等、密钥权限与缺项拒绝通过；无效白名单、三类配置反例均被拒绝。")
 
 
 def main():
