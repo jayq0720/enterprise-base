@@ -1,7 +1,7 @@
 # AGENTS.md：共用开发规范
 
-本仓库由 JQ、Claude、Gemini、Grok 共同开发。三个 AI 开工前必须先读完本文件，再读各自的 `CLAUDE.md`、`GEMINI.md`、`GROK.md`。
-方案依据：《企业基础平台开发方案（第 4 版：用开源项目组装）》。一句话：**Dify 管 AI，Frappe + Frappe HR + Frappe Wiki 管人和流程，我们只写把两边连起来的 5 个模块（X1–X5）。**
+本仓库由 JQ、Claude、GPT 共同开发。Claude 和 GPT 开工前必须先读完本文件，再读各自的 `CLAUDE.md`、`GPT.md`。
+方案依据：《企业基础平台开发方案（第 5 版）》。一句话：**Dify 管 AI，Frappe + Frappe HR + Frappe Wiki 管人和流程，我们只写把两边连起来的 5 个模块（X1–X5）。**
 
 ## 1. 目录归属
 
@@ -9,17 +9,19 @@
 | --- | --- | --- |
 | `services/kb_gateway/` | Claude | X3 按岗位检索服务（独立服务） |
 | `services/frappe_mcp/` | Claude | X4 Frappe MCP 服务（独立服务） |
+| `services/policy_sync/` | Claude | X5 制度文档同步（独立服务） |
 | `config/dify/` | Claude | Dify 应用 DSL 导出（问答应用、Agent 应用） |
+| `.github/` | Claude | CI |
+| `tests/e2e/` | Claude | 端到端测试 |
 | `docs/`（`docs/manual/` 除外） | Claude | 架构、ADR、验证清单、任务卡、周报 |
-| `frappe_apps/enterprise_base/duties/` | Gemini | X1 岗位职责扩展 |
-| `services/policy_sync/` | Gemini | X5 制度文档同步（独立服务） |
-| `config/frappe/` | Gemini | Frappe 导出的 fixtures（Workflow、Role、Custom Field） |
-| `tests/e2e/`、`docs/manual/` | Gemini | 端到端测试、用户和管理员手册 |
-| `frappe_apps/enterprise_base/wecom/` | Grok | X2 企业微信对接 |
-| `deploy/`、`.github/`、`config/dify-on-wechat/` | Grok | 部署、CI、企业微信入口配置 |
-| 根目录文件（本文件、`pyproject.toml` 等） | Claude | 改动在 PR 里提出 |
+| `deploy/` | GPT | 全部开源组件的部署、升级、备份、监控 |
+| `frappe_apps/enterprise_base/` | GPT | `duties/` 是 X1 岗位职责扩展，`wecom/` 是 X2 企业微信对接 |
+| `config/frappe/` | GPT | Frappe 导出的 fixtures（Workflow、Role、Custom Field） |
+| `config/dify-on-wechat/` | GPT | 企业微信入口配置 |
+| `docs/manual/` | GPT | 用户、管理员、运维手册 |
+| 根目录文件（本文件、`.gitignore` 等） | Claude | 改动在 PR 里提出 |
 
-不改别人负责的目录。确实需要时，在自己的 PR 描述里写清楚原因并 @ 负责人。
+不改别人负责的目录。确实需要时，在自己的 PR 描述里写清楚原因。
 
 ## 2. 组装原则（硬规则）
 
@@ -48,12 +50,23 @@
 
 ## 5. 任务、分支、PR
 
-1. 任务编号：Claude `P<阶段>-C<n>`、Gemini `P<阶段>-M<n>`、Grok `P<阶段>-R<n>`。每个任务开工前 Claude 在 `docs/task-cards/` 给出任务卡。
-2. 分支名：`claude/P1-C1-kb-gateway`、`gemini/P1-M1-duties`、`grok/P0-R1-compose` 这种格式。
+1. 任务编号：Claude `P<阶段>-C<n>`、GPT `P<阶段>-G<n>`。GPT 的任务由 JQ 分发，每个任务开工前 Claude 在 `docs/task-cards/` 给出任务卡。
+2. 分支名：`claude/P1-C1-kb-gateway`、`gpt/P0-G1-compose` 这种格式。
 3. 一个 PR 只做一件事，不超过 400 行（不含锁文件、fixtures 导出、测试数据）。
 4. PR 描述：做了什么 / 怎么测的 / 任务编号 / 新增依赖及许可证。
-5. 流程：CI 全绿 → Claude 审（Claude 自己的 PR 由 JQ 看） → 作者修改 → JQ 合并。不直接推 `main`。
-6. 每个 PR 必须带的测试：权限拒绝（无岗位、岗位不符）；敏感字段不出现在返回和日志里；Frappe fixtures 能在空库导入。
+5. 流程：CI 全绿 → 互审（Claude 审 GPT 的 PR，GPT 复看 Claude 的 PR）→ 作者修改 → JQ 合并。不直接推 `main`。
+6. 每个 PR 必须带的测试：权限拒绝（无岗位、岗位不符、未授权用户不能登录）；敏感字段不出现在返回、同步结果和日志里；Frappe fixtures 能在空库导入；部署改动附一次成功运行的日志摘要（去掉密钥）。
+
+### GPT 的代码怎么进仓库
+
+两种方式都按上面的规则走，由 JQ 定用哪种：
+
+- **GPT 自己提 PR**（默认）：GPT 用自己的 GitHub 账号，从 `gpt/…` 分支提 PR。
+- **Claude 代提交**：GPT 把改动交给 JQ（补丁、压缩包或文件），JQ 转给 Claude。Claude 原样放进 `gpt/…` 分支，提交信息写明“代 GPT 提交”，PR 描述照 GPT 给的写，只修 lint、格式这类机械问题，并在 PR 里逐条列出改了什么。实质性问题不替 GPT 改，写成审阅意见退回 GPT。
+
+两种方式下 Claude 都要审，JQ 都要合并；代提交时 Claude 不能既改又判“可合并”，审阅意见必须写在 PR 里，留给 JQ 看。
+
+GPT 不能直接登录服务器时：GPT 写好脚本和步骤，由 JQ 执行，把输出（去掉密钥）贴回给 GPT。
 
 ## 6. 节奏
 

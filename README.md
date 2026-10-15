@@ -10,10 +10,10 @@
 
 | 编号 | 位置 | 模块 | 负责 |
 | --- | --- | --- | --- |
-| X1 | `frappe_apps/enterprise_base/duties/` | 岗位职责扩展（Frappe App） | Gemini |
-| X2 | `frappe_apps/enterprise_base/wecom/` | 企业微信对接（Frappe App） | Grok |
+| X1 | `frappe_apps/enterprise_base/duties/` | 岗位职责扩展（Frappe App） | GPT |
+| X2 | `frappe_apps/enterprise_base/wecom/` | 企业微信对接（Frappe App） | GPT |
 | X3 | `services/kb_gateway/` | 按岗位检索服务 | Claude |
 | X4 | `services/frappe_mcp/` | Frappe MCP 服务 | Claude |
-| X5 | `services/policy_sync/` | 制度文档同步 | Gemini |
+| X5 | `services/policy_sync/` | 制度文档同步 | Claude |
 
-开发规范见 [AGENTS.md](AGENTS.md)；架构决定见 [docs/adr/](docs/adr/)；本地部署见 `deploy/LOCAL.md`（P0-R1 交付）。
+开发规范见 [AGENTS.md](AGENTS.md)；架构决定见 [docs/adr/](docs/adr/)；本地部署见 `deploy/LOCAL.md`（P0-G1 交付）。
