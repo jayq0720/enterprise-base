@@ -1,4 +1,4 @@
-"""隔离验证 Compose 与 Caddy 回环访问限制；不构建镜像或启动业务容器。"""
+"""隔离验证部署配置与入口限制；不构建镜像或启动业务容器。"""
 import copy
 import json
 import os
