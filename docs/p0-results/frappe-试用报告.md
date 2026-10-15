@@ -9,6 +9,7 @@
 | 5.3 | Custom Field 需准确为 wecom_userid、Data、唯一；REST 四字段白名单 | 建字段、查询、重复拒绝待测 |
 | 5.4 | Wiki v3.4.0 有 Wiki Document.is_published 与空间发布/角色；旧 Wiki Page.published 仍在 | 实际事件、Webhook 与撤权链路待测 |
 | 5.5 | Role 控制操作，User Permission 限制 Link 记录；Designation 不等于 Role | 按岗位/文档读取与导出隔离待测 |
+| 5.5 模块可见性 | 普通用户隐藏 ERPNext 不需用的财务/销售模块，并验证 REST/报表权限 | 待试配及空库重测，不以隐藏菜单代替权限拒绝 |
 | 5.6 | 本报告为准备记录 | 结论待试用证据 |
 | 3.1、6.1 | 企业微信回调与 sys.user_id 相等的判定步骤已定义 | 回调、收发、身份均待测 |
 | 6.2 | 客户公网域名、可信 IP 与备案要求 | 待部署时由 JQ 确认 |

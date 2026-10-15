@@ -47,6 +47,8 @@ fields=["name","department","designation","status"]
 
 按岗位授权试验单独建立测试角色，使用 Role Permission Manager 控制 DocType 操作，使用 User Permission 限定实际 Link 字段的记录，并设置 Applicable For。Designation 是岗位数据，不会自动成为系统 Role；没有目标岗位/部门 Link 的 DocType，不能假定权限会递归生效。对列表、按 name 读取、导出分别使用授权/非授权账号验证，记录角色叠加导致的放宽情况。X1 的岗位职责清单和白名单方法属于后续 App 扩展，本试配不实现 X3/X4/X5。
 
+HRMS 必需的 ERPNext 同时带来财务、销售等模块。试配时按普通员工/主管/HR 的最小角色集合隐藏不需要的模块和 Workspace，并验证其 DocType/REST/报表同样不可越权访问；只隐藏菜单不算权限隔离。将对应角色/权限配置导出并在空库重测，在试用报告记录实际可见模块和拒绝结果。当前未执行，不预先声称已隐藏。
+
 ## Wiki 发布、下架与 X5 接口调查
 
 固定 Wiki v3.4.0 源码中同时存在：旧 `Wiki Page` 的 `published/content/route/allow_guest`；新版 `Wiki Document` 的 `is_published/content/route/wiki_space`；`Wiki Space` 也有 `is_published/roles/root_group`。官方 hooks 已对 `Wiki Document` 的 `on_update/on_trash` 和 `Wiki Space` 的 `on_update/on_trash` 注册处理。依据：[旧页面](https://github.com/frappe/wiki/blob/v3.4.0/wiki/wiki/doctype/wiki_page/wiki_page.json)、[新版文档](https://github.com/frappe/wiki/blob/v3.4.0/wiki/frappe_wiki/doctype/wiki_document/wiki_document.json)、[空间](https://github.com/frappe/wiki/blob/v3.4.0/wiki/wiki/doctype/wiki_space/wiki_space.json)、[hooks](https://github.com/frappe/wiki/blob/v3.4.0/wiki/hooks.py)。这只是源码核对，尚未确认实际 UI 操作触发链。

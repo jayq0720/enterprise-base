@@ -20,4 +20,4 @@ uv sync && uv run ruff check . && uv run ruff format --check . && uv run mypy . 
 
 `main` 的分支保护（必须 PR、必须 CI 通过）由 JQ 在 GitHub 仓库 Settings → Branches 里开。
 
-部署校验不需要 Docker Engine，只需 Compose 命令、Git、uv 及 Python 3.12；首次运行需要联网获取锁定的官方源。检查默认本机入口和自定义 HTTPS 域名两组配置，并验证镜像固定版本、命名卷、端口/网络边界、密钥初始化幂等/权限/缺项拒绝。全过程不启动服务，不读取或覆盖服务器已有密钥和运行数据；详细范围见 `deploy/VALIDATION.md`。配置校验通过不代表延期的运行验收通过。
+部署校验不需要 Docker Engine，只需 Compose 命令、Git、uv 及 Python 3.12；首次运行联网获取锁定的官方源和按 SHA256 验证的 Caddy 2.10.2。检查默认本机入口和自定义公网 HTTPS 配置，验证镜像固定版本、命名卷、端口/网络边界、密钥初始化幂等/权限/缺项拒绝；用 Caddy 实际解析路由，并在随机回环端口短暂验证后台来源限制、403 与伪造头拒绝。测试使用固定响应后端，不启动业务容器，不访问业务服务，不读取或覆盖服务器已有密钥和运行数据；详细范围见 `deploy/VALIDATION.md`。检查通过不代表延期的运行验收通过。

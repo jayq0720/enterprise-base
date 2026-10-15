@@ -8,6 +8,7 @@ services:
       DIFY_ADDRESS: ${EB_SCHEME:-http}://dify.${EB_DOMAIN:-localhost}
       HR_ADDRESS: ${EB_SCHEME:-http}://hr.${EB_DOMAIN:-localhost}
       WECOM_ADDRESS: ${EB_SCHEME:-http}://wecom.${EB_DOMAIN:-localhost}
+      EB_ADMIN_ALLOW_CIDRS: ${EB_ADMIN_ALLOW_CIDRS:-127.0.0.1/32}
     volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
     networks: [edge]
   wechat:

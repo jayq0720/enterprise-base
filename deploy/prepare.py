@@ -1,5 +1,6 @@
 """仅组装官方部署文件；生成物在 data/，密钥在 secrets/。"""
 import copy
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -51,6 +52,12 @@ if mode == "init":
     print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖。")
     sys.exit()
 settings = env(sys.argv[2] if mode in {"check", "wechat"} else mode)
+try:
+    admin_ranges = [ipaddress.ip_network(value) for value in settings.get("EB_ADMIN_ALLOW_CIDRS", "127.0.0.1/32").split()]
+    if not admin_ranges or any(network.prefixlen == 0 for network in admin_ranges):
+        raise ValueError
+except ValueError:
+    sys.exit("管理后台来源必须是有效 IP/CIDR；不允许空白、全网范围或配置表达式。")
 required = [k for k, v in env(".env.example").items() if v == "CHANGE_ME"]
 if mode in {"check", "wechat"}:
     keys = required if mode == "check" else [k for k in env(".env.example") if k.startswith("WECHAT") or k == "DIFY_API_KEY"]
