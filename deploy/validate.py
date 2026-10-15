@@ -1,5 +1,6 @@
-"""隔离验证部署配置；只运行 Compose config，不构建镜像或启动服务。"""
+"""隔离验证部署配置与入口限制；不构建镜像或启动业务容器。"""
 import copy
+import base64
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,16 @@ def settings(path):
 
 
 def audit(model, stack):
+    if stack == "dify":
+        services = model["services"]
+        require(services["nginx"]["image"] == "nginx:1.28.0@sha256:552e7481ca93ffccd046aa658dbbed22caefbc09c66fa7cd247cbb90b8a5c609",
+                "Dify nginx 必须使用已核验摘要的 Debian 版，提供 bash。")
+        require(services["plugin_daemon"]["environment"]["LOG_LEVEL"] == "WARN"
+                and all(services[name]["environment"]["LOG_LEVEL"] == "WARNING"
+                        for name in ("api", "worker", "worker_beat")), "插件/Python 服务日志级别不兼容。")
+        key = services["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"]
+        require(bool(re.fullmatch(r"[A-Za-z0-9_-]{43}", key))
+                and len(base64.urlsafe_b64decode(key + "=")) == 32, "Agent 密钥不是 32 字节无填充 base64url。")
     for service in model["services"].values():
         image = service["image"]
         # PostgreSQL 10+ 使用主版本.补丁版本，其它当前组件使用三段版本。
@@ -53,20 +64,60 @@ def audit(model, stack):
 
 
 def reject_mutations(model):
-    for defect in ("image", "ports", "volume"):
+    for defect in ("image", "ports", "volume", "nginx", "plugin_log", "worker_log", "agent_key"):
         bad = copy.deepcopy(model)
         api = bad["services"]["api"]
         if defect == "image":
             api["image"] = "langgenius/dify-api:latest"
         elif defect == "ports":
             api["ports"] = [{"target": 5001, "published": "5001"}]
-        else:
+        elif defect == "volume":
             api["volumes"] = [{"type": "volume", "target": "/app/api/storage"}]
+        elif defect == "nginx":
+            bad["services"]["nginx"]["image"] = "nginx:1.28.0-alpine"
+        elif defect == "plugin_log":
+            bad["services"]["plugin_daemon"]["environment"]["LOG_LEVEL"] = "WARNING"
+        elif defect == "worker_log":
+            bad["services"]["worker"]["environment"]["LOG_LEVEL"] = "WARN"
+        else:
+            bad["services"]["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"] = "a" * 64
         try:
             audit(bad, "dify")
         except RuntimeError:
             continue
         raise RuntimeError(f"反例未被拒绝：{defect}。")
+
+
+def check_bootstrap(service, work):
+    # 执行真实 shell 命令、替换 bench 为参数记录器；不模拟数据库验收。
+    folder = work / "bootstrap-probe"
+    folder.mkdir(exist_ok=True)
+    trace = folder / "trace.jsonl"
+    bench = folder / "bench"
+    bench.write_text(f"#!{sys.executable}\n" + """import json, os, sys
+with open(os.environ['EB_BOOTSTRAP_TRACE'], 'a') as trace:
+    trace.write(json.dumps(sys.argv[1:]) + '\\n')
+if 'execute' in sys.argv and os.environ.get('EB_FAIL_TELEMETRY') == '1':
+    sys.exit(1)
+""")
+    bench.chmod(0o700)
+    environment = {**os.environ, "PATH": f"{folder}{os.pathsep}{os.environ['PATH']}",
+                   "EB_BOOTSTRAP_TRACE": str(trace), "SITE": "test.invalid", "SITE_URL": "http://test.invalid",
+                   "DB_ROOT_PASSWORD": "synthetic-test-value", "ADMIN_PASSWORD": "synthetic-test-value"}
+    for failed in (False, True):
+        trace.write_text("")
+        # Compose config 输出为可再次载入的配置，需还原 $$ 转义才等同容器命令。
+        command = [part.replace("$$", "$") for part in service["command"]]
+        result = subprocess.run([*service["entrypoint"], *command], cwd=folder,
+                                env={**environment, "EB_FAIL_TELEMETRY": str(int(failed))}, capture_output=True)
+        require((result.returncode != 0) == failed, "建站 shell 未按失败停止。")
+        calls = [json.loads(line) for line in trace.read_text().splitlines()]
+        execute = [args for args in calls if "execute" in args]
+        require(len(execute) == 1 and execute[0][3:5] == ["frappe.db.set_single_value", "--args"]
+                and json.loads(execute[0][5]) == ["System Settings", "enable_telemetry", 0],
+                "遥测必须使用数据库 Single 接口，参数须保持整数 0。")
+        require((calls[-1] == ["--site", "test.invalid", "enable-scheduler"]) != failed,
+                "调度器必须在成功设置遥测后开启。")
 
 
 def reuse_source_cache(work, lock):
@@ -99,6 +150,12 @@ def validate(work):
     require(len({values[k] for k in secret_keys}) == len(secret_keys), "服务未使用独立随机密钥。")
     prepare("check", "secrets/.env")
     prepare("check", ".env.example", success=False)
+    malformed = work / "secrets/malformed.env"
+    for key in ("a" * 64, values["DIFY_AGENT_SERVER_SECRET_KEY"] + "=", "invalid"):
+        malformed.write_text("".join(f"{k}={key if k == 'DIFY_AGENT_SERVER_SECRET_KEY' else v}\n" for k, v in values.items()))
+        prepare("check", str(malformed), success=False)
+        prepare(str(malformed), success=False)
+    malformed.unlink()
     prepare("wechat", "secrets/.env", success=False)
     # 缺失整个配置项也必须拒绝，不能只检查已有键。
     incomplete = work / "secrets/incomplete.env"
@@ -139,6 +196,8 @@ def validate(work):
                 api = services["api"]["environment"]
                 require(api["VECTOR_STORE"] == "qdrant" and api["CODE_EXECUTION_API_KEY"] == values["SANDBOX_API_KEY"],
                         "Dify 向量配置或 Sandbox 密钥不一致。")
+                require(services["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"]
+                        == values["DIFY_AGENT_SERVER_SECRET_KEY"], "Agent 密钥未正确传递。")
                 require(services["sandbox"]["environment"]["API_KEY"] == values["SANDBOX_API_KEY"], "Sandbox 密钥未传递。")
                 require(set(services["sandbox"]["networks"]) == {"ssrf_proxy_network"}
                         and model["networks"]["ssrf_proxy_network"]["internal"], "Sandbox 隔离网络被放宽。")
@@ -147,10 +206,9 @@ def validate(work):
                 require(services["frontend"]["environment"]["FRAPPE_SITE_NAME_HEADER"] == f"hr.{domain}",
                         "Frappe 站点域名未传递。")
                 require("edge" not in services["backend"]["networks"], "Frappe 后端直接接入入口网络。")
-                command_text = " ".join(services["create-site"]["command"])
-                require("frappe.client.set_value" in command_text and '"enable_telemetry":0' in command_text,
-                        "Frappe 未设置实际 System Settings 遥测开关。")
+                check_bootstrap(services["create-site"], work)
             print(f"{project}/{stack}：配置通过，镜像固定、数据卷命名、端口边界正确。")
+    print("四类启动兼容性反例被拒绝；建站参数与失败停止检查通过。")
     require(all(values[k] not in output for k in secret_keys), "初始化或生成输出包含密钥。")
     require(all(f.stat().st_mode & 0o777 == 0o600 for f in (work / "secrets").iterdir()), "密钥文件权限不是 600。")
     require((work / "secrets").stat().st_mode & 0o777 == 0o700, "密钥目录权限不是 700。")

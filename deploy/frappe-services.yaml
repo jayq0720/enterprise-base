@@ -34,5 +34,5 @@ services:
         test -f "sites/$$SITE/site_config.json" || bench new-site "$$SITE" --db-root-username root --db-root-password "$$DB_ROOT_PASSWORD" --admin-password "$$ADMIN_PASSWORD" --mariadb-user-host-login-scope '%';
         for app in erpnext hrms wiki; do bench --site "$$SITE" install-app "$$app"; done;
         bench --site "$$SITE" set-config host_name "$$SITE_URL";
-        bench --site "$$SITE" execute frappe.client.set_value --kwargs '{"doctype":"System Settings","name":"System Settings","fieldname":{"enable_telemetry":0}}' >/dev/null;
+        bench --site "$$SITE" execute frappe.db.set_single_value --args '["System Settings","enable_telemetry",0]' >/dev/null;
         bench --site "$$SITE" enable-scheduler

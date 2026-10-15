@@ -15,6 +15,32 @@ make status
 
 浏览器打开 `http://dify.localhost/install` 创建管理员，打开 `http://hr.localhost` 用 `Administrator` 和服务器 `secrets/.env` 中的 `EB_FRAPPE_ADMIN_PASSWORD` 登录。若系统不解析子域名，将 `dify.localhost hr.localhost wecom.localhost` 加入 hosts，指向 `127.0.0.1`。Frappe 的公司向导先用测试公司，真实组织配置在 G3/G4 导出 fixtures。
 
+## 旧测试环境修复（PR #9 发现的启动问题）
+
+新环境直接 `make init`。已初始化的环境不会自动覆盖密钥；若检查提示 Agent 密钥格式错误，先在 `deploy/` 执行 `make down`，再运行以下命令，仅替换旧版生成的 64 位十六进制 Agent 密钥，其他配置原样保留。旧文件以 600 权限保留在 `secrets/.env.before-agent-key`；已有该备份时命令拒绝覆盖。密钥变化会使原 Agent Stub 令牌失效，需重新发起测试会话。
+
+```sh
+uv run --python 3.12 python - <<'PY'
+import os, re, secrets
+from pathlib import Path
+os.umask(0o077)
+path = Path("secrets/.env")
+text = path.read_text()
+pattern = r"(?m)^DIFY_AGENT_SERVER_SECRET_KEY=[0-9a-f]{64}$"
+if len(re.findall(pattern, text)) != 1:
+    raise SystemExit("仅适用于旧版生成的 Agent 密钥；未修改文件。")
+backup = path.with_name(".env.before-agent-key")
+with backup.open("x") as output:
+    output.write(text)
+path.chmod(0o600)
+path.write_text(re.sub(pattern, lambda _: "DIFY_AGENT_SERVER_SECRET_KEY=" + secrets.token_urlsafe(32), text))
+PY
+make up
+make status
+```
+
+不删除 `data/`、命名卷或其它密钥。`make up` 重新生成配置、拉取固定摘要的 Debian Nginx；全局日志保持 `WARNING`，仅插件守护进程用 `WARN`，不要在环境文件把全局改成 `WARN`。站点已经创建时仍会重试应用安装、遥测设置和调度器开启；遥测使用数据库 Single 接口，避免未完成公司向导时触发必填校验。步骤依据 [Claude 实测记录](../docs/p0-results/P0-本地实测-Claude.md)，修复后的完整启动仍需在 Docker 环境复测。
+
 ## 企业微信入口
 在 Dify 后台创建 Chatflow，API Key 只填进服务器 `secrets/.env` 的 `DIFY_API_KEY`；填写该文件所有 `WECHAT*` 项，AES Key 为企业微信后台给出的 43 位值，Agent ID 用纯数字。然后：
 ```sh

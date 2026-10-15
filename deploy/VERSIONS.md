@@ -12,7 +12,8 @@
 | Frappe / ERPNext / HRMS / Wiki | v15.123.1 / v15.123.0 / v15.64.3 / v3.4.0 | [MIT](https://github.com/frappe/frappe/blob/v15.123.1/LICENSE) / [GPL-3.0](https://github.com/frappe/erpnext/blob/v15.123.0/license.txt) / [GPL-3.0](https://github.com/frappe/hrms/blob/v15.64.3/license.txt) / [MIT](https://github.com/frappe/wiki/blob/v3.4.0/LICENSE) |
 | HR 构建工具 Python / Node / Dockerfile frontend | 3.12.12-slim-bookworm / 22.20.0 / 1.19.0 | PSF / MIT / Apache-2.0；使用官方 frappe_docker，不改源码 |
 | PostgreSQL / MariaDB / Redis | 15.18-alpine / 10.11.14 / 6.2.20-alpine | PostgreSQL / GPL-2.0 / BSD-3-Clause |
-| Nginx / BusyBox / Caddy | 1.28.0-alpine / 1.37.0 / 2.10.2-alpine | BSD-2-Clause / GPL-2.0 / Apache-2.0 |
+| Nginx（Debian，含 bash） | `nginx:1.28.0@sha256:552e7481ca93ffccd046aa658dbbed22caefbc09c66fa7cd247cbb90b8a5c609` | BSD-2-Clause；[官方镜像](https://hub.docker.com/_/nginx)，摘要为多架构 OCI index，2026-10-15 从官方 Registry 读取并核验 |
+| BusyBox / Caddy | 1.37.0 / 2.10.2-alpine | GPL-2.0 / Apache-2.0 |
 | Ubuntu Squid（两个 SSRF 代理） | `sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029` | GPL-2.0；Ubuntu 官方镜像，摘要锁定 |
 | dify-on-wechat | `hanfangyuan/dify-on-wechat@sha256:2ef2ecf9f081301fd34f9ceb4397f1d6cd6dac2eb42789285970a6f31752ad76` | [MIT](https://github.com/hanfangyuan4396/dify-on-wechat/blob/4685a7d89aa6881c14459037bc1d1564f84a9224/LICENSE)；官方发布镜像按摘要锁定，不声称与该源码提交完全一致 |
 | 部署脚本 PyYAML | 6.0.2 | MIT；通过 uv 独立运行，无服务端 Python 依赖变更 |

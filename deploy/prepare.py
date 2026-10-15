@@ -1,4 +1,5 @@
 """仅组装官方部署文件；生成物在 data/，密钥在 secrets/。"""
+import base64
 import copy
 import json
 import os
@@ -47,11 +48,19 @@ if mode == "init":
     if not Path("secrets/.env").exists():
         write("secrets/.env", Path(".env.example").read_text().replace("CHANGE_ME", "__GENERATE__"))
         values = env("secrets/.env")
-        write("secrets/.env", "".join(f"{k}={secrets.token_hex(32) if v == '__GENERATE__' else v}\n" for k, v in values.items()))
+        for key, value in values.items():
+            if value == "__GENERATE__":
+                values[key] = secrets.token_urlsafe(32) if key == "DIFY_AGENT_SERVER_SECRET_KEY" else secrets.token_hex(32)
+        write("secrets/.env", "".join(f"{k}={v}\n" for k, v in values.items()))
     print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖。")
     sys.exit()
 settings = env(sys.argv[2] if mode in {"check", "wechat"} else mode)
 required = [k for k, v in env(".env.example").items() if v == "CHANGE_ME"]
+if mode != "wechat":
+    agent_key = settings.get("DIFY_AGENT_SERVER_SECRET_KEY", "")
+    if (not re.fullmatch(r"[A-Za-z0-9_-]{43}", agent_key)
+            or base64.urlsafe_b64encode(base64.urlsafe_b64decode(agent_key + "=")).decode().rstrip("=") != agent_key):
+        sys.exit("DIFY_AGENT_SERVER_SECRET_KEY 必须是 32 字节无填充 base64url；旧测试环境修复步骤见 LOCAL.md。")
 if mode in {"check", "wechat"}:
     keys = required if mode == "check" else [k for k in env(".env.example") if k.startswith("WECHAT") or k == "DIFY_API_KEY"]
     if any(not settings.get(k) or settings[k] == "CHANGE_ME" for k in keys):
@@ -90,6 +99,8 @@ for name, svc in active.items():
     svc["depends_on"] = ({k: v for k, v in deps.items() if k in active} if isinstance(deps, dict)
                          else [k for k in deps if k in active])
     svc["env_file"] = [str(ROOT / "secrets/dify.env")] if svc.get("env_file") else []
+    if name == "plugin_daemon":
+        svc.setdefault("environment", {})["LOG_LEVEL"] = "WARN"
     mounts = []
     for mount in svc.get("volumes", []):
         src, target, *options = mount.split(":")
