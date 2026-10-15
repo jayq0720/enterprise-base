@@ -1,0 +1,17 @@
+{
+  "sources": {
+    "dify": {"url":"https://github.com/langgenius/dify.git", "commit":"8387590ace4a094de812b7847fc6a4c3a27cd52b", "paths":"/docker/\n/LICENSE\n"},
+    "frappe": {"url":"https://github.com/frappe/frappe_docker.git", "commit":"3556154478dffca8f3bcdee47d43b65d04a2c962", "paths":"/compose.yaml\n/images/\n/resources/\n/LICENSE\n"}
+  },
+  "frappe_image": "enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0",
+  "dify_images": {
+    "init_permissions":"busybox:1.37.0",
+    "db_postgres":"postgres:15.18-alpine",
+    "redis":"redis:6.2.20-alpine",
+    "ssrf_proxy":"ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029",
+    "agent_ssrf_proxy":"ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029",
+    "nginx":"nginx:1.28.0-alpine",
+    "qdrant":"qdrant/qdrant:v1.15.5"
+  },
+  "wechat_plugins": ["Godcmd", "Banwords", "BDunit", "ChatSummary", "Finish", "Hello", "Role", "tool", "linkai", "Apilot", "JinaSum", "CustomDifyApp", "GroupAtAutoreply", "Suno", "Dungeon", "Keyword"]
+}

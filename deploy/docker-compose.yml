@@ -1,0 +1,32 @@
+name: ${EB_PROJECT:-eb}
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ["${EB_BIND:-127.0.0.1}:80:80", "${EB_BIND:-127.0.0.1}:443:443"]
+    environment:
+      DIFY_ADDRESS: ${EB_SCHEME:-http}://dify.${EB_DOMAIN:-localhost}
+      HR_ADDRESS: ${EB_SCHEME:-http}://hr.${EB_DOMAIN:-localhost}
+      WECOM_ADDRESS: ${EB_SCHEME:-http}://wecom.${EB_DOMAIN:-localhost}
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+    networks: [edge]
+  wechat:
+    image: hanfangyuan/dify-on-wechat@sha256:2ef2ecf9f081301fd34f9ceb4397f1d6cd6dac2eb42789285970a6f31752ad76
+    platform: linux/amd64
+    profiles: [wechat]
+    restart: unless-stopped
+    env_file: [{path: ./secrets/wechat.env, required: false}]
+    entrypoint: [sh, -c, "exec python app.py >/dev/null 2>&1"]
+    logging: {driver: none}
+    volumes:
+      - ../config/dify-on-wechat/config.json:/app/config.json:ro
+      - /dev/null:/app/run.log
+      - wechat_data:/app/data
+      - ./data/plugins.json:/app/plugins/plugins.json:ro
+    networks: [edge]
+networks:
+  edge: {name: "${EB_PROJECT:-eb}_edge"}
+volumes:
+  caddy_data:
+  caddy_config:
+  wechat_data:
