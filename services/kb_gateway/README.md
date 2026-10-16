@@ -8,16 +8,16 @@
 
 1. Dify 问答应用（Chatflow）的 HTTP 请求节点调 `POST /v1/search`，请求头 `Authorization: Bearer <EB_KB_SERVICE_TOKEN>`，请求体 `{"user_id": "{{#sys.user_id#}}", "query": "{{#sys.query#}}", "top_k": 5}`。`user_id` 必须绑定系统变量，不能交给模型填。
 2. 按企业微信 userid 到 Frappe 查在职员工的部门、岗位（只取这三个字段）；查不到、或一个 userid 对应多人，一律不检索。
-3. 调 X1 提供的方法，取这个岗位可见的知识空间（每个空间对应一个 Dify 知识库）。
+3. 调 X1 提供的方法取全部知识空间（每个空间对应一个 Dify 知识库），按提问人的范围标记（`all`、`desig:<岗位>`、`dept:<部门>`）筛出他能看的空间。还没配岗位的在职员工只有 `all`，只看全员可见内容。
 4. 在每个知识库里检索，用文档元数据 `eb_scope` 过滤；返回后再在本地复核一遍，缺范围标记的文档一律丢弃。
-5. 合并、按分数排序，返回出处列表；检索不到时 `notice` 给出原因，由 LLM 转告员工。
+5. 合并、按分数排序，返回出处列表；检索不到时 `notice` 给出原因，由 LLM 转告员工。某个知识库出错时跳过它；全部出错或 Frappe 不可用时返回“检索暂时不可用”，不报 500。
 
 ## 依赖其他模块的约定
 
 | 约定 | 提供方 | 内容 |
 | --- | --- | --- |
 | Employee 自定义字段 `wecom_userid` | X2（GPT） | 通讯录同步时写入企业微信 userid，唯一 |
-| 白名单方法 `enterprise_base.duties.api.knowledge_spaces_for_designation` | X1（GPT） | 参数 `designation`；返回 `[{"space": "公司制度", "dify_dataset_id": "..."}]`；只给本服务的 API 用户开权限 |
+| 白名单方法 `enterprise_base.duties.api.knowledge_spaces` | X1（GPT） | 无参数；返回 `[{"space": "人事手册", "wiki_space": "...", "dify_dataset_id": "...", "scope": ["dept:人事部 - TC", "desig:HRBP"]}]`；和 X5 用同一个方法，见 `docs/task-cards/P1-G1-X1知识空间接口与Wiki推送.md` |
 | 文档元数据 `eb_scope` | X5（Claude） | `,all,` 或 `,dept:<部门>,desig:<岗位>,`；部门、岗位名不能含英文逗号 |
 
 字段名和方法路径都可以用环境变量改，见 `.env.example`。
@@ -31,4 +31,4 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 ## 状态
 
-P0 骨架：接口、权限过滤和测试已完成，用假的 Frappe、Dify 测试。Dify 检索 API 的实际字段名待 P0 验证清单 3.3 实测后核对（解析集中在 `dify.py`）。
+P1-C1：按 X1 的知识空间范围筛空间、没岗位只看全员可见、Dify 出错不报 500。Dify 检索字段已在 P0 实测核对（见 `docs/p0-results/P0-本地实测-Claude.md`）。

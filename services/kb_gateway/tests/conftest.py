@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 from kb_gateway.config import Settings
@@ -31,11 +32,15 @@ class FakeKnowledge:
     def __init__(self, data: dict[str, list[RawRecord]]) -> None:
         self.data = data
         self.calls: list[tuple[str, dict[str, object]]] = []
+        self.broken: set[str] = set()
 
     async def retrieve(
         self, dataset_id: str, query: str, top_k: int, conditions: dict[str, object]
     ) -> list[RawRecord]:
         self.calls.append((dataset_id, conditions))
+        if dataset_id in self.broken:
+            req = httpx.Request("POST", f"http://dify.test/v1/datasets/{dataset_id}/retrieve")
+            raise httpx.HTTPStatusError("boom", request=req, response=httpx.Response(500))
         return self.data.get(dataset_id, [])
 
 
@@ -46,18 +51,20 @@ def rec(title: str, score: float, scope: str | None) -> RawRecord:
     )
 
 
+POLICY = KnowledgeSpace(name="公司制度", dataset_id="ds-policy", scope=["all"])
+
 HRBP = EmployeeProfile(
     employee="HR-EMP-0001",
     department="人事部",
     designation="HRBP",
     spaces=[
-        KnowledgeSpace(name="公司制度", dataset_id="ds-policy"),
-        KnowledgeSpace(name="人事手册", dataset_id="ds-hr"),
+        POLICY,
+        KnowledgeSpace(name="人事手册", dataset_id="ds-hr", scope=["desig:HRBP"]),
     ],
 )
 SALES = EmployeeProfile(
     employee="HR-EMP-0002",
     department="销售部",
     designation="销售代表",
-    spaces=[KnowledgeSpace(name="公司制度", dataset_id="ds-policy")],
+    spaces=[POLICY],
 )

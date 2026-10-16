@@ -33,6 +33,8 @@ class KnowledgeSpace(BaseModel):
 
     name: str
     dataset_id: str
+    # 可见范围标记，例如 ["all"] 或 ["dept:人事部 - TC", "desig:HRBP"]
+    scope: list[str]
 
 
 class EmployeeProfile(BaseModel):
