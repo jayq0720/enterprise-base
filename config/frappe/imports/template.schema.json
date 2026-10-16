@@ -2,6 +2,7 @@
   "version": 1,
   "header_row": 1,
   "data_start_row": 2,
+  "employee_mode": "update_only",
   "sheets": [
     {
       "name": "部门",
