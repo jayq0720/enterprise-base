@@ -1,0 +1,64 @@
+{
+  "doctype": "DocType",
+  "name": "EB Knowledge Space",
+  "module": "Duties",
+  "custom": 0,
+  "istable": 0,
+  "engine": "InnoDB",
+  "field_order": [
+    "space_name",
+    "wiki_space",
+    "dify_dataset_id",
+    "visible_to_all",
+    "departments"
+  ],
+  "fields": [
+    {
+      "fieldname": "space_name",
+      "fieldtype": "Data",
+      "label": "名称",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "wiki_space",
+      "fieldtype": "Link",
+      "label": "Wiki 空间",
+      "options": "Wiki Space",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "dify_dataset_id",
+      "fieldtype": "Data",
+      "label": "Dify 知识库 ID"
+    },
+    {
+      "fieldname": "visible_to_all",
+      "fieldtype": "Check",
+      "label": "全员可见"
+    },
+    {
+      "fieldname": "departments",
+      "fieldtype": "Table",
+      "label": "可见部门",
+      "options": "EB Space Department"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    },
+    {
+      "role": "EB Integration",
+      "read": 1
+    }
+  ],
+  "autoname": "field:space_name",
+  "title_field": "space_name",
+  "track_changes": 1
+}
