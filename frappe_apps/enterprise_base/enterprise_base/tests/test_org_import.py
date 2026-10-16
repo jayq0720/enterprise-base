@@ -51,7 +51,8 @@ class TestOrgImport(FrappeTestCase):
         self.assertFalse(self.run_import(False)["errors"])
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         for _ in range(2):
-            self.assertTrue(self.run_import()["saved"])
+            result = self.run_import()
+            self.assertTrue(result.get("saved"), result)
         self.emp.reload()
         self.assertEqual(self.emp.designation, self.rows[1][0][0])
         self.assertEqual(frappe.db.count("Designation", {"name": self.emp.designation}), 1)

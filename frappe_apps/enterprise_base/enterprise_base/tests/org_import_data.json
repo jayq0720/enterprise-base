@@ -11,6 +11,6 @@
   "user": {
     "doctype": "User", "email": "org-import-$id@test.invalid", "first_name": "Import HR",
     "enabled": 1, "send_welcome_email": 0, "user_type": "System User",
-    "roles": [{"role": "HR Manager"}]
+    "roles": [{"role": "HR Manager"}, {"role": "HR User"}]
   }
 }
