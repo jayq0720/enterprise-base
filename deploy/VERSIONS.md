@@ -18,7 +18,7 @@
 | dify-on-wechat | `hanfangyuan/dify-on-wechat@sha256:2ef2ecf9f081301fd34f9ceb4397f1d6cd6dac2eb42789285970a6f31752ad76` | [MIT](https://github.com/hanfangyuan4396/dify-on-wechat/blob/4685a7d89aa6881c14459037bc1d1564f84a9224/LICENSE)；官方发布镜像按摘要锁定，不声称与该源码提交完全一致 |
 | 部署脚本 PyYAML | 6.0.2 | MIT；通过 uv 独立运行，无服务端 Python 依赖变更 |
 | enterprise_base（X1） | 0.1.0；安装于原固定组合，Frappe 镜像后缀 `-eb0.1.0` | 本仓库 Frappe App，GPL-3.0-only；不修改上游源码 |
-| policy-sync（X5） | 本仓库 CI 构建；摘要待发布后回填 `.env.example` | 本仓库独立服务；运行依赖许可证由 CI 检查，不声明第三方授权 |
+| policy-sync（X5） | `sha256:1acf30802cee38263053928435b0695eaf841c5d111c5ae2c7f33591b63ddceb`；[CI 发布记录](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38855562933) | 本仓库独立服务；运行依赖许可证由 CI 检查，不声明第三方授权 |
 | X5 构建 Python / uv 镜像 | 3.12.12-slim-bookworm / 0.11.32 | PSF / MIT 或 Apache-2.0；仅官方 Python、Astral 镜像 |
 
 实际启动的 Dify 服务全部保留上游命令、依赖条件、健康检查及隔离网络；仅裁掉未选数据库/向量库与 certbot，覆盖镜像版本、命名卷、环境变量和入口网络。只暴露 Caddy，插件调试、数据库、Qdrant 端口不发布。Dify Marketplace 仍需联网手动安装国产插件；关闭 Next.js 遥测、更新检查、Sentry/Amplitude，不将这些设置描述为完整的出口封锁。

@@ -172,6 +172,14 @@ def validate(work):
     prepare("policy-sync", "secrets/.env", success=False)
     # 缺失整个配置项也必须拒绝，不能只检查已有键。
     incomplete = work / "secrets/incomplete.env"
+    policy = dict(values)
+    api_keys = ("EB_SYNC_FRAPPE_API_KEY", "EB_SYNC_FRAPPE_API_SECRET", "EB_SYNC_DIFY_DATASET_API_KEY")
+    policy.update({key: "synthetic-test-value" for key in api_keys})
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in policy.items()))
+    prepare("policy-sync", str(incomplete))
+    for missing in api_keys:
+        incomplete.write_text("".join(f"{k}={v}\n" for k, v in policy.items() if k != missing))
+        prepare("policy-sync", str(incomplete), success=False)
     incomplete.write_text("\n".join(f"{k}={'synthetic-test-value' if k.startswith('WECHAT') or k == 'DIFY_API_KEY' else v}"
                                      for k, v in values.items()) + "\n")
     prepare("wechat", str(incomplete))

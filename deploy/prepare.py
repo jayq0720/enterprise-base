@@ -80,6 +80,8 @@ if mode in {"check", "wechat", "policy-sync"}:
         sys.exit("必填凭据未配置；请只在服务器编辑 secrets/.env。")
     if mode == "policy-sync" and not re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-policy-sync@sha256:[a-f0-9]{64}", settings.get("EB_POLICY_SYNC_IMAGE", "")):
         sys.exit("policy-sync 必须使用本仓库 CI 发布的 SHA256 镜像摘要。")
+    if mode == "policy-sync" and any(len(settings[k]) < 32 for k in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN")):
+        sys.exit("两项 X5 密钥都必须至少 32 位。")
     sys.exit()
 if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", settings["EB_PROJECT"]) or not re.fullmatch(r"[a-zA-Z0-9.-]+", settings["EB_DOMAIN"]):
     sys.exit("项目名或域名格式错误。")
