@@ -20,13 +20,12 @@ class TestOrgImport(FrappeTestCase):
             if row["doctype"] != "Version" and not frappe.db.exists(row["doctype"], row["name"]):
                 frappe.get_doc(row).insert()
         self.suffix = frappe.generate_hash(length=8)
-        employee = data["employee"]
-        employee.update(first_name="Import", user_id=None, leave_approver=None)
-        employee.update(employee_number=self.suffix, wecom_userid=self.suffix)
-        self.emp = frappe.get_doc(employee).insert()
-        self.rows = json.loads(
+        case = json.loads(
             Path(__file__).with_name("org_import_data.json").read_text().replace("$id", self.suffix)
         )
+        data["employee"].update(case["employee"])
+        self.emp = frappe.get_doc(data["employee"]).insert()
+        self.rows, self.user = case["rows"], case["user"]
 
     def content(self, extra=None):
         book, output = Workbook(), io.BytesIO()
@@ -49,10 +48,13 @@ class TestOrgImport(FrappeTestCase):
         return import_workbook(file.file_url, self.emp.company, save)
 
     def test_save_and_repeat(self):
+        frappe.get_doc(self.user).insert()
+        frappe.set_user(self.user["email"])
         self.assertFalse(self.run_import(False)["errors"])
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         for _ in range(2):
-            self.assertTrue(self.run_import()["saved"])
+            result = self.run_import()
+            self.assertTrue(result.get("saved"), result)
         self.emp.reload()
         self.assertEqual(self.emp.designation, self.rows[1][0][0])
         self.assertEqual(frappe.db.count("Designation", {"name": self.emp.designation}), 1)
@@ -103,12 +105,15 @@ class TestOrgImport(FrappeTestCase):
         self.assertEqual(self.emp.wecom_userid, self.suffix)
 
     def test_unprivileged_and_sensitive_headers(self):
-        frappe.set_user("Guest")
-        try:
-            with self.assertRaises(frappe.PermissionError):
-                import_workbook("unread", "unread", True)
-        finally:
-            frappe.set_user("Administrator")
+        self.user["roles"] = [{"role": "HR User"}]
+        frappe.get_doc(self.user).insert()
+        for user in ("Guest", self.user["email"]):
+            frappe.set_user(user)
+            try:
+                with self.assertRaises(frappe.PermissionError):
+                    import_workbook("unread", "unread", True)
+            finally:
+                frappe.set_user("Administrator")
         for field in ("手机号", "身份证号", "银行卡", "薪资"):
             content = self.content(extra=field)
             rows, errors = read_rows(content)
