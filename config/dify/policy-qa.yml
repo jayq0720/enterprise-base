@@ -1,0 +1,306 @@
+app:
+  description: 员工问公司制度，只在提问人岗位可见的知识空间里检索（X3），回答附出处。
+  icon: 📘
+  icon_background: '#E0F2FE'
+  icon_type: emoji
+  mode: advanced-chat
+  name: 制度问答
+  use_icon_as_answer_icon: false
+# 模型插件不在这里写死：导入前先在 Dify 装好通义千问插件并录入 Key，导入后在“制度问答”节点里可以换成别的国内模型
+dependencies: []
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: X3 按岗位检索服务的地址，例如 http://kb-gateway:8080
+    id: 5b0c6a8e-6f3e-4a0e-9a59-1c3f0e3c2a01
+    name: x3_url
+    selector:
+    - env
+    - x3_url
+    value: http://kb-gateway:8080
+    value_type: string
+  - description: X3 的服务间 Token（EB_KB_SERVICE_TOKEN），导入后在“环境变量”里填写，不进仓库
+    id: 5b0c6a8e-6f3e-4a0e-9a59-1c3f0e3c2a02
+    name: x3_token
+    selector:
+    - env
+    - x3_token
+    value: ''
+    value_type: secret
+  features:
+    file_upload: {}
+    opening_statement: 你好，我可以回答公司制度方面的问题，回答会注明出处。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: http-request
+      id: start-x3
+      source: start
+      sourceHandle: source
+      target: x3
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: x3-fmt
+      source: x3
+      sourceHandle: source
+      target: fmt
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: if-else
+      id: fmt-check
+      source: fmt
+      sourceHandle: source
+      target: check
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: check-llm
+      source: check
+      sourceHandle: 'true'
+      target: llm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: answer
+      id: check-notice
+      source: check
+      sourceHandle: 'false'
+      target: notice
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: llm-answer
+      source: llm
+      sourceHandle: source
+      target: answer
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        title: 开始
+        type: start
+        variables: []
+      id: start
+      position:
+        x: 0
+        y: 200
+      type: custom
+    # 身份只取 sys.user_id（企业微信 userid，由 dify-on-wechat 设置），不交给模型，见 ADR 0001
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        # X3 连不上或超时时不让整个对话报错，按 503 交给下一步，员工收到“暂时不可用”
+        default_value:
+        - key: status_code
+          type: number
+          value: 503
+        - key: body
+          type: string
+          value: ''
+        - key: headers
+          type: object
+          value: {}
+        error_strategy: default-value
+        body:
+          data:
+          - type: text
+            value: '{"user_id": "{{#sys.user_id#}}", "query": "{{#sys.query#}}", "top_k": 5}'
+          type: json
+        headers: 'Authorization:Bearer {{#env.x3_token#}}'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 1
+          retry_enabled: true
+          retry_interval: 500
+        timeout:
+          max_connect_timeout: 5
+          max_read_timeout: 15
+          max_write_timeout: 5
+        title: 按岗位检索
+        type: http-request
+        url: '{{#env.x3_url#}}/v1/search'
+        variables: []
+      id: x3
+      position:
+        x: 300
+        y: 200
+      type: custom
+    - data:
+        code: |
+          import json
+
+
+          def main(status_code: int, body: str) -> dict:
+              """把 X3 的检索结果整理成模型上下文和出处列表。"""
+              unavailable = "知识库检索暂时不可用，请稍后再试。"
+              if status_code != 200:
+                  return {"has_records": 0, "context": "", "refs": "", "notice": unavailable}
+              try:
+                  data = json.loads(body)
+              except ValueError:
+                  return {"has_records": 0, "context": "", "refs": "", "notice": unavailable}
+              records = data.get("records") or []
+              if not records:
+                  notice = data.get("notice") or "没有找到相关制度。可以换个说法再问，或联系 HR。"
+                  return {"has_records": 0, "context": "", "refs": "", "notice": notice}
+              blocks, refs, seen = [], [], []
+              for i, r in enumerate(records, 1):
+                  title = r.get("title", "")
+                  blocks.append(f"[{i}]《{title}》（{r.get('space', '')}）\n{r.get('content', '')}")
+                  if title not in seen:
+                      seen.append(title)
+                      refs.append(f"[{i}]《{title}》")
+              return {
+                  "has_records": 1,
+                  "context": "\n\n".join(blocks),
+                  "refs": "\n".join(refs),
+                  "notice": "",
+              }
+        code_language: python3
+        outputs:
+          context:
+            children: null
+            type: string
+          has_records:
+            children: null
+            type: number
+          notice:
+            children: null
+            type: string
+          refs:
+            children: null
+            type: string
+        title: 整理检索结果
+        type: code
+        variables:
+        - value_selector:
+          - x3
+          - status_code
+          variable: status_code
+        - value_selector:
+          - x3
+          - body
+          variable: body
+      id: fmt
+      position:
+        x: 600
+        y: 200
+      type: custom
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: '='
+            id: has-records
+            value: '1'
+            varType: number
+            variable_selector:
+            - fmt
+            - has_records
+          id: 'true'
+          logical_operator: and
+        title: 有没有检索到
+        type: if-else
+      id: check
+      position:
+        x: 900
+        y: 200
+      type: custom
+    # 没检索到时直接转告原因，不调模型，避免模型凭空编制度
+    - data:
+        answer: '{{#fmt.notice#}}'
+        title: 告知原因
+        type: answer
+        variables: []
+      id: notice
+      position:
+        x: 1200
+        y: 350
+      type: custom
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 4
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: system
+          role: system
+          text: |
+            你是公司的制度问答助手。只根据下面“检索到的制度”回答员工的问题。
+
+            规则：
+            1. 只用检索到的内容回答，不要补充制度里没有的规定，也不要猜测。
+            2. 每个要点后面用 [编号] 标注出处，编号对应下面的条目。
+            3. 检索到的内容不足以回答时，直接说“现有制度里没有找到明确规定，建议咨询 HR”。
+            4. 不要透露或推测任何人的手机号、身份证号、银行卡号、薪资等个人信息。
+            5. 用简洁的中文回答。
+
+            检索到的制度：
+            {{#fmt.context#}}
+        selected: false
+        title: 制度问答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      id: llm
+      position:
+        x: 1200
+        y: 100
+      type: custom
+    - data:
+        answer: "{{#llm.text#}}\n\n出处：\n{{#fmt.refs#}}"
+        title: 回复
+        type: answer
+        variables: []
+      id: answer
+      position:
+        x: 1500
+        y: 100
+      type: custom
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8
+  rag_pipeline_variables: []
