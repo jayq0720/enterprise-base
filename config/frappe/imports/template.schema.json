@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "header_row": 1,
+  "data_start_row": 2,
+  "employee_mode": "update_only",
+  "sheets": [
+    {
+      "name": "部门",
+      "columns": [
+        {
+          "name": "名称",
+          "required": true
+        },
+        {
+          "name": "上级部门",
+          "required": false,
+          "on_empty": "clear"
+        }
+      ]
+    },
+    {
+      "name": "岗位",
+      "columns": [
+        {
+          "name": "名称",
+          "required": true
+        },
+        {
+          "name": "岗位职责",
+          "required": true
+        },
+        {
+          "name": "可见的知识空间",
+          "required": false,
+          "on_empty": "clear"
+        }
+      ]
+    },
+    {
+      "name": "员工任职",
+      "columns": [
+        {
+          "name": "工号",
+          "required": true
+        },
+        {
+          "name": "姓名",
+          "required": true
+        },
+        {
+          "name": "企业微信 userid",
+          "required": false,
+          "on_empty": "keep"
+        },
+        {
+          "name": "部门",
+          "required": true
+        },
+        {
+          "name": "岗位",
+          "required": true
+        },
+        {
+          "name": "直属上级工号",
+          "required": false,
+          "on_empty": "clear"
+        },
+        {
+          "name": "入职日期",
+          "required": false,
+          "on_empty": "keep"
+        }
+      ]
+    },
+    {
+      "name": "说明",
+      "columns": [
+        "工作表",
+        "列名或事项",
+        "必填",
+        "规则",
+        "示例"
+      ]
+    }
+  ],
+  "on_empty_values": {
+    "keep": "留空不改系统里的原值",
+    "clear": "留空清空系统里的值"
+  },
+  "employee_match": {
+    "key": "工号",
+    "verify": [
+      "姓名"
+    ],
+    "on_mismatch": "reject_file"
+  }
+}

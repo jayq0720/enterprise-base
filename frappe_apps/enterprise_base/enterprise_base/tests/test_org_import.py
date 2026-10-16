@@ -1,3 +1,5 @@
+"""真实 Frappe 站点：全量拒绝、事务回滚、幂等及字段边界。"""
+
 import io
 import json
 from pathlib import Path
@@ -84,6 +86,15 @@ class TestOrgImport(FrappeTestCase):
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         self.assertFalse(frappe.db.exists("Department", {"department_name": self.rows[0][1][0]}))
 
+    def test_optional_columns_keep_existing_values(self):
+        joined = frappe.db.get_value("Employee", self.emp.name, "date_of_joining")
+        self.rows[2][0][2] = self.rows[2][0][6] = ""
+        self.assertTrue(self.run_import()["saved"])
+        self.emp.reload()
+        self.assertEqual(self.emp.wecom_userid, self.suffix)
+        self.assertEqual(self.emp.date_of_joining, joined)
+        self.assertEqual(self.emp.designation, self.rows[1][0][0])
+
     def test_other_employee_userid_is_rejected(self):
         other = frappe.copy_doc(self.emp)
         other.employee_number, other.wecom_userid = self.suffix + "b", self.suffix + "b"
@@ -94,12 +105,15 @@ class TestOrgImport(FrappeTestCase):
         self.assertEqual(self.emp.wecom_userid, self.suffix)
 
     def test_unprivileged_and_sensitive_headers(self):
-        frappe.set_user("Guest")
-        try:
-            with self.assertRaises(frappe.PermissionError):
-                import_workbook("unread", "unread", True)
-        finally:
-            frappe.set_user("Administrator")
+        self.user["roles"] = [{"role": "HR User"}]
+        frappe.get_doc(self.user).insert()
+        for user in ("Guest", self.user["email"]):
+            frappe.set_user(user)
+            try:
+                with self.assertRaises(frappe.PermissionError):
+                    import_workbook("unread", "unread", True)
+            finally:
+                frappe.set_user("Administrator")
         for field in ("手机号", "身份证号", "银行卡", "薪资"):
             content = self.content(extra=field)
             rows, errors = read_rows(content)
