@@ -82,6 +82,8 @@ if mode in {"check", "wechat", "policy-sync"}:
         sys.exit("policy-sync 必须使用本仓库 CI 发布的 SHA256 镜像摘要。")
     if mode == "policy-sync" and any(len(settings[k]) < 32 for k in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN")):
         sys.exit("两项 X5 密钥都必须至少 32 位。")
+    if mode == "policy-sync" and settings.get("EB_SYNC_DIFY_INDEXING_TECHNIQUE", "high_quality") not in {"high_quality", "economy"}:
+        sys.exit("X5 索引方式仅允许 high_quality 或 economy。")
     sys.exit()
 if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", settings["EB_PROJECT"]) or not re.fullmatch(r"[a-zA-Z0-9.-]+", settings["EB_DOMAIN"]):
     sys.exit("项目名或域名格式错误。")
@@ -157,7 +159,8 @@ sync.update(EB_SYNC_WEBHOOK_SECRET=settings.get("EB_SYNC_WEBHOOK_SECRET", ""),
             EB_FRAPPE_URL="http://frontend:8080", EB_DIFY_API_BASE="http://dify/v1",
             EB_FRAPPE_API_KEY=settings.get("EB_SYNC_FRAPPE_API_KEY", ""),
             EB_FRAPPE_API_SECRET=settings.get("EB_SYNC_FRAPPE_API_SECRET", ""),
-            EB_DIFY_DATASET_API_KEY=settings.get("EB_SYNC_DIFY_DATASET_API_KEY", ""))
+            EB_DIFY_DATASET_API_KEY=settings.get("EB_SYNC_DIFY_DATASET_API_KEY", ""),
+            EB_DIFY_INDEXING_TECHNIQUE=settings.get("EB_SYNC_DIFY_INDEXING_TECHNIQUE", "high_quality"))
 write("secrets/policy-sync.env", "".join(f"{k}={v}\n" for k, v in sync.items()))
 write("secrets/frappe-integration.env", f'EB_SYNC_WEBHOOK_SECRET={settings.get("EB_SYNC_WEBHOOK_SECRET", "")}\n')
 cfg = hr["services"]["configurator"]
