@@ -5,7 +5,7 @@ from pathlib import Path
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-from frappe.permissions import add_permission, setup_custom_perms
+from frappe.permissions import add_permission, rights, setup_custom_perms
 
 from enterprise_base.duties.access import READABLE
 
@@ -50,6 +50,12 @@ def configure() -> None:
         filters = {"parent": doctype, "role": "EB Integration", "permlevel": 0, "if_owner": 0}
         if not frappe.db.exists("Custom DocPerm", filters):
             add_permission(doctype, "EB Integration", ptype="read")
+        permission = frappe.get_doc(
+            "Custom DocPerm", frappe.db.get_value("Custom DocPerm", filters)
+        )
+        permission.update({right: int(right == "read") for right in rights})
+        permission.save()
+        frappe.clear_cache(doctype=doctype)
     initial = Path(frappe.get_app_path("enterprise_base", "setup_fixtures", "user.json"))
     users = (
         json.loads(initial.read_text())
@@ -69,4 +75,7 @@ def configure() -> None:
     )
     for user in users:
         if not frappe.db.exists("User", user["email"]):
-            frappe.get_doc(user).insert()
+            doc = frappe.get_doc(user).insert()
+            # Wiki 的 after_insert 会自动加 Wiki User；技术身份不继承该额外角色。
+            doc.set("roles", [{"role": "EB Integration"}])
+            doc.save()

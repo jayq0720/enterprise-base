@@ -1,0 +1,48 @@
+[
+  {
+    "doctype": "User",
+    "email": "eb-x3@integration.invalid",
+    "first_name": "X3",
+    "name": "eb-x3@integration.invalid",
+    "roles": [
+      {
+        "parent": "eb-x3@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "Wiki User"
+      },
+      {
+        "parent": "eb-x3@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "EB Integration"
+      }
+    ],
+    "user_type": "Website User",
+    "enabled": 0,
+    "send_welcome_email": 0
+  },
+  {
+    "doctype": "User",
+    "email": "eb-x5@integration.invalid",
+    "first_name": "X5",
+    "name": "eb-x5@integration.invalid",
+    "roles": [
+      {
+        "parent": "eb-x5@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "Wiki User"
+      },
+      {
+        "parent": "eb-x5@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "EB Integration"
+      }
+    ],
+    "user_type": "Website User",
+    "enabled": 0,
+    "send_welcome_email": 0
+  }
+]
