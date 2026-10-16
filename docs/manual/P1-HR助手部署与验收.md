@@ -28,7 +28,7 @@ make status
 
 先按 [模型插件验收](P0-模型插件验收.md) 安装国产模型官方插件、录入 Key。后台地址为 `dify.<服务器配置域名>`，仍受管理员来源白名单保护。
 
-1. 工具 → MCP → 添加：地址 `http://frappe-mcp:8080/mcp/`，**服务标识必须填 `eb-hr`**，认证请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`，值从服务器密钥文件读取，仅在后台录入。保存并确认能发现工具。X4 升级新增工具后，在同一 MCP 服务点击“更新”。
+1. 工具 → MCP → 添加：地址 `http://frappe-mcp:8080/mcp/`，**服务标识必须填 `eb-hr`**，认证请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`，值从服务器密钥文件读取，仅在后台录入。保存并确认能发现工具。X4 升级新增工具后，在同一 MCP 服务点击“更新”。以后修改这个 MCP 服务的地址或 Token，保存后工具会显示未授权，要先点“授权”，再点“更新”，否则工作流调用工具会失败。
 2. 工作室 → 创建应用 → 导入 DSL，选择仓库 `config/dify/hr-assistant.yml`。
 3. 应用 → 环境变量：`x3_url=http://kb-gateway:8080`、`x4_url=http://frappe-mcp:8080`；`x3_token` 填服务器 `EB_KB_SERVICE_TOKEN`，`x4_token` 填 `EB_MCP_SERVICE_TOKEN`，两项保持 secret 类型。
 4. 检查模型节点选用已配置的国产模型、MCP 节点绑定 eb-hr，发布应用。在“API 访问”生成应用 Key；接企业微信时将其填入服务器 `DIFY_API_KEY`，再按 LOCAL.md 运行 `make wechat`。
