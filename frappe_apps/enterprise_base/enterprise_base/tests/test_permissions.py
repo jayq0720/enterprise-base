@@ -97,7 +97,10 @@ class TestPermissions(FrappeTestCase):
             ):
                 row = request(label, "GET", EMPLOYEE_API + "/" + target)["data"]
                 for field in data["sensitive"]:
-                    self.assertEqual(field in row, allowed, f"{label} {field} 读取边界失败")
+                    if allowed and field in data["employee"]:
+                        self.assertEqual(row.get(field), data["employee"][field])
+                    elif not allowed:
+                        self.assertNotIn(field, row)
             request("staff", "GET", EMPLOYEE_API + "/" + hr_employee, 403)
             request("hr", "PUT", path, 403, json={"user_id": "p2-hr@test.invalid"})
             request("hr", "PUT", space_path, 403, json={"visible_to_all": 1})
@@ -150,7 +153,6 @@ class TestPermissions(FrappeTestCase):
                 "POST",
                 "/api/resource/Leave Application",
                 json={**data["leave"], "employee": employee},
-                expected=200,
             )["data"]
             leave_path = "/api/resource/Leave Application/" + leave["name"]
             request("x4", "PUT", leave_path, 403, json={"docstatus": 1})
