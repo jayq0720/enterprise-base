@@ -70,3 +70,5 @@ fixtures.extend(
     {"dt": dt, "filters": [["name", "like", "EB %"]]}
     for dt in ("Workflow", "Workflow State", "Workflow Action Master")
 )
+
+persistent_cache_keys = ["eb-org-import"]
