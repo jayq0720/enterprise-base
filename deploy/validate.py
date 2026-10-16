@@ -47,6 +47,21 @@ def audit(model, stack):
         key = services["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"]
         require(bool(re.fullmatch(r"[A-Za-z0-9_-]{43}", key))
                 and len(base64.urlsafe_b64decode(key + "=")) == 32, "Agent 密钥不是 32 字节无填充 base64url。")
+        require(all({"default", "ssrf_proxy_network", "edge"} == set(services[n]["networks"])
+                    for n in ("api", "worker", "ssrf_proxy")), "Dify 无法在内网访问 X3/X4。")
+        proxy = services["ssrf_proxy"]["environment"]
+        require(proxy["SSRF_PROXY_ALLOW_PRIVATE_DOMAINS"] == "kb-gateway,frappe-mcp"
+                and not proxy["SSRF_PROXY_ALLOW_PRIVATE_IPS"]
+                and not services["agent_ssrf_proxy"]["environment"]["SSRF_PROXY_ALLOW_PRIVATE_DOMAINS"],
+                "SSRF 放行范围必须仅限 X3/X4，且不扩大 Agent 代理权限。")
+    if stack == "frappe":
+        for name in ("kb-gateway", "frappe-mcp"):
+            service = model["services"][name]
+            require(bool(re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-" + name + r"@sha256:[a-f0-9]{64}", service["image"]))
+                    and set(service["networks"]) == {"default", "edge"}
+                    and not service.get("network_mode") and not service.get("privileged"), "X3/X4 镜像或网络隔离错误。")
+            require(service["healthcheck"]["test"] == ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"],
+                    "X3/X4 健康检查必须 GET /healthz。")
     for service in model["services"].values():
         image = service["image"]
         # PostgreSQL 10+ 使用主版本.补丁版本，其它当前组件使用三段版本。
@@ -66,7 +81,7 @@ def audit(model, stack):
 
 
 def reject_mutations(model):
-    for defect in ("image", "ports", "volume", "nginx", "plugin_log", "worker_log", "agent_key"):
+    for defect in ("image", "ports", "volume", "nginx", "plugin_log", "worker_log", "agent_key", "proxy", "network"):
         bad = copy.deepcopy(model)
         api = bad["services"]["api"]
         if defect == "image":
@@ -81,8 +96,12 @@ def reject_mutations(model):
             bad["services"]["plugin_daemon"]["environment"]["LOG_LEVEL"] = "WARNING"
         elif defect == "worker_log":
             bad["services"]["worker"]["environment"]["LOG_LEVEL"] = "WARN"
-        else:
+        elif defect == "agent_key":
             bad["services"]["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"] = "a" * 64
+        elif defect == "proxy":
+            bad["services"]["ssrf_proxy"]["environment"]["SSRF_PROXY_ALLOW_PRIVATE_IPS"] = "10.0.0.0/8"
+        else:
+            api["networks"].pop("edge")
         try:
             audit(bad, "dify")
         except RuntimeError:
@@ -149,12 +168,14 @@ def validate(work):
     require(private.read_bytes() == before, "重复初始化覆盖了密钥。")
     values = settings(private)
     original = dict(values)
+    upgraded = {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", "EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET"}
+    added = {k for k in values if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_"))}
     private.write_text("".join(f"{k}={v}\n" for k, v in values.items()
-                               if k not in {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN"}))
+                               if k not in upgraded | added))
     prepare("init")
     values = settings(private)
-    require(all(values[k] == v for k, v in original.items() if not k.startswith("EB_SYNC_")),
-            "补齐 X5 密钥时覆盖了已有配置。")
+    require(all(values[k] == v for k, v in original.items() if k not in upgraded),
+            "补齐服务密钥时覆盖了已有配置。")
     secret_keys = [k for k, v in settings(work / ".env.example").items() if v == "CHANGE_ME"]
     require(len({values[k] for k in secret_keys}) == len(secret_keys), "服务未使用独立随机密钥。")
     for key in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN"):
@@ -170,8 +191,20 @@ def validate(work):
     malformed.unlink()
     prepare("wechat", "secrets/.env", success=False)
     prepare("policy-sync", "secrets/.env", success=False)
+    prepare("hr-assistant", "secrets/.env", success=False)
     # 缺失整个配置项也必须拒绝，不能只检查已有键。
     incomplete = work / "secrets/incomplete.env"
+    assistant = dict(values)
+    credentials = ("EB_KB_FRAPPE_API_KEY", "EB_KB_FRAPPE_API_SECRET", "EB_KB_DIFY_DATASET_API_KEY", "EB_MCP_FRAPPE_API_KEY", "EB_MCP_FRAPPE_API_SECRET")
+    assistant.update({key: "synthetic-" + key for key in credentials})
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in assistant.items()))
+    prepare("hr-assistant", str(incomplete))
+    for defect, replacement in {**dict.fromkeys(credentials, ""), "EB_KB_GATEWAY_IMAGE": "image:latest",
+            "EB_FRAPPE_MCP_IMAGE": "image:latest", "EB_MCP_SESSION_SECRET": values["EB_MCP_SERVICE_TOKEN"],
+            "EB_KB_SERVICE_TOKEN": "short", "EB_MCP_FRAPPE_API_KEY": assistant["EB_KB_FRAPPE_API_KEY"]}.items():
+        incomplete.write_text("".join(f"{k}={replacement if k == defect else v}\n" for k, v in assistant.items()))
+        prepare("hr-assistant", str(incomplete), success=False)
+    values.update({key: assistant[key] for key in credentials})
     policy = dict(values)
     api_keys = ("EB_SYNC_FRAPPE_API_KEY", "EB_SYNC_FRAPPE_API_SECRET", "EB_SYNC_DIFY_DATASET_API_KEY")
     policy.update({key: "synthetic-test-value" for key in api_keys})
@@ -207,7 +240,7 @@ def validate(work):
             if profile:
                 command += ["--profile", profile]
             if stack == "frappe":
-                command += ["--profile", "policy-sync"]
+                command += ["--profile", "policy-sync", "--profile", "hr-assistant"]
             run([*command, "config", "--quiet"], work)
             rendered = run([*command, "config", "--format", "json"], work)
             model = json.loads(rendered)
@@ -263,16 +296,37 @@ def validate(work):
                 require(services["create-site"]["environment"]["EB_SYNC_WEBHOOK_SECRET"]
                         == values["EB_SYNC_WEBHOOK_SECRET"], "Frappe 未得到签名密钥。")
                 check_bootstrap(services["create-site"], work)
+                for name, prefix in (("kb-gateway", "EB_KB"), ("frappe-mcp", "EB_MCP")):
+                    config = services[name]["environment"]
+                    require(config["EB_FRAPPE_URL"] == "http://frontend:8080"
+                            and all(config["EB_FRAPPE_API_" + suffix] == values[prefix + "_FRAPPE_API_" + suffix] for suffix in ("KEY", "SECRET"))
+                            and config[prefix + "_SERVICE_TOKEN"] == values[prefix + "_SERVICE_TOKEN"], "X3/X4 地址、专用凭据映射错误。")
+                    require(set(config) == set(settings(ROOT.parent / f"services/{name.replace('-', '_')}/.env.example")), "X3/X4 收到了额外配置或其它服务密钥。")
+                    for defect in ("ports", "networks", "image"):
+                        bad = copy.deepcopy(model)
+                        bad["services"][name][defect] = {"ports": [{"target": 8080, "published": "8080"}], "networks": {"default": {}}, "image": "image:latest"}[defect]
+                        try:
+                            audit(bad, "frappe")
+                        except RuntimeError:
+                            continue
+                        raise RuntimeError("X3/X4 隔离反例未被拒绝。")
+                require(services["kb-gateway"]["environment"]["EB_DIFY_API_BASE"] == "http://dify/v1"
+                        and services["kb-gateway"]["environment"]["EB_DIFY_DATASET_API_KEY"] == values["EB_KB_DIFY_DATASET_API_KEY"]
+                        and services["frappe-mcp"]["environment"]["EB_MCP_SESSION_SECRET"] == values["EB_MCP_SESSION_SECRET"]
+                        and json.loads(services["frappe-mcp"]["environment"]["EB_MCP_ALLOWED_HOSTS"]) == ["frappe-mcp:8080"], "X3/X4 检索、会话签名或 MCP Host 配置错误。")
             print(f"{project}/{stack}：配置通过，镜像固定、数据卷命名、端口边界正确。")
     print("四类启动兼容性反例被拒绝；建站参数与失败停止检查通过。")
     require(all(values[k] not in output for k in secret_keys), "初始化或生成输出包含密钥。")
     require(all(f.stat().st_mode & 0o777 == 0o600 for f in (work / "secrets").iterdir()), "密钥文件权限不是 600。")
     require((work / "secrets").stat().st_mode & 0o777 == 0o700, "密钥目录权限不是 700。")
     print("初始化幂等、密钥权限与缺项拒绝通过；无效白名单、三类配置反例均被拒绝。")
+    print("X3/X4：独立凭据、补齐配置、MCP Host、健康检查、隔离与 Git 忽略通过；SSRF 仅放行两项服务名。")
 
 
 def main():
     require(shutil.which(COMPOSE[0]) is not None, "找不到 Compose 校验程序。")
+    for name in ("kb-gateway", "frappe-mcp"):
+        run(["git", "check-ignore", "-q", f"secrets/{name}.env"], ROOT)
     with tempfile.TemporaryDirectory(prefix="eb-validation-") as temp:
         work = Path(temp) / "deploy"
         work.mkdir()
@@ -281,9 +335,10 @@ def main():
         config = Path(temp) / "config/dify-on-wechat"
         config.mkdir(parents=True)
         shutil.copyfile(ROOT.parent / "config/dify-on-wechat/config.json", config / "config.json")
-        sync = Path(temp) / "services/policy_sync"
-        sync.mkdir(parents=True)
-        shutil.copyfile(ROOT.parent / "services/policy_sync/.env.example", sync / ".env.example")
+        for name in ("policy_sync", "kb_gateway", "frappe_mcp"):
+            folder = Path(temp) / "services" / name
+            folder.mkdir(parents=True)
+            shutil.copyfile(ROOT.parent / f"services/{name}/.env.example", folder / ".env.example")
         reuse_source_cache(work, json.loads((work / "upstream.lock.json").read_text()))
         validate(work)
     print("隔离校验结束；未启动容器，未读写现有部署密钥或运行数据。")
