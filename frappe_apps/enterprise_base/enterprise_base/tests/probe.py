@@ -71,7 +71,9 @@ def verify_http_contract() -> None:
         ):
             response = client.get(path, query_string=params, headers=headers)
             if response.status_code != expected:
-                raise RuntimeError(f"真实 HTTP {path} 状态码 {response.status_code}，应为 {expected}。")
+                raise RuntimeError(
+                    f"真实 HTTP {path} 状态码 {response.status_code}，应为 {expected}。"
+                )
         response = client.get(
             "/api/method/enterprise_base.duties.api.knowledge_spaces", headers={"Host": site}
         )
