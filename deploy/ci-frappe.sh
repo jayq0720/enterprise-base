@@ -18,8 +18,8 @@ for attempt in {1..60}; do
   sleep 2
 done
 test "$ready" = true
-if test -f deploy/data/ci-frappe.tar; then
-  docker load -i deploy/data/ci-frappe.tar
+if test -f deploy/data/ci-frappe.tar.gz; then
+  docker load -i deploy/data/ci-frappe.tar.gz
 else
 source_dir=$(mktemp -d)
 git -C "$source_dir" init
@@ -32,10 +32,12 @@ docker build -f "$source_dir/images/custom/Containerfile" --secret id=apps_json,
   --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 \
   -t eb-frappe-contract:0.1.0 "$source_dir"
 mkdir -p deploy/data
-docker save eb-frappe-contract:0.1.0 -o deploy/data/ci-frappe.tar
+docker builder prune -af
+docker save eb-frappe-contract:0.1.0 | gzip > deploy/data/ci-frappe.tar.gz
 fi
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
   -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
+docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/
