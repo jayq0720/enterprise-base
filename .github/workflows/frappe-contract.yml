@@ -1,0 +1,30 @@
+name: frappe-contract
+on:
+  pull_request:
+    paths: ['frappe_apps/**', 'config/frappe/**', '.github/workflows/frappe-contract.yml', 'deploy/ci-frappe*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frappe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.11.32'
+      - name: App 静态检查
+        working-directory: frappe_apps/enterprise_base
+        run: |
+          uv sync --frozen --python 3.12
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy enterprise_base
+      - name: 真实站点测试、导出和空库导入
+        run: bash deploy/ci-frappe.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frappe-fixtures
+          path: artifacts/*.json
+          retention-days: 3
