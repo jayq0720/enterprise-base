@@ -30,14 +30,20 @@ docker build -f "$source_dir/images/custom/Containerfile" --secret id=apps_json,
   --build-arg FRAPPE_BRANCH=v15.123.1 --build-arg PYTHON_VERSION=3.12.12 \
   --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 \
   --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 \
-  -t eb-frappe-contract:0.1.0 "$source_dir"
+  -t eb-frappe-contract:0.1.0 "$source_dir" >/tmp/eb-frappe-build.log 2>&1 || {
+    tail -n 80 /tmp/eb-frappe-build.log; exit 1;
+  }
 mkdir -p deploy/data
 docker builder prune -af
 docker save eb-frappe-contract:0.1.0 | gzip > deploy/data/ci-frappe.tar.gz
 fi
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
-  -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh
+  -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh \
+  >/tmp/eb-frappe-test.log 2>&1 || {
+    tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 100; exit 1;
+  }
+tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting' || true
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/
