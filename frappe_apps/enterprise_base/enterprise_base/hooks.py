@@ -6,8 +6,8 @@ app_email = "maintainers@example.invalid"
 app_license = "GPL-3.0"
 required_apps = ["hrms", "wiki"]
 before_install = "enterprise_base.install.ensure_role"
-after_sync = "enterprise_base.install.configure"
-after_migrate = "enterprise_base.install.configure"
+after_sync = ["enterprise_base.install.configure", "enterprise_base.integration.configure_webhooks"]
+after_migrate = after_sync
 doc_events = {
     doctype: {
         "validate": "enterprise_base.duties.validation.validate_scope_name",
@@ -43,3 +43,5 @@ fixtures.extend(
         },
     ]
 )
+
+fixtures.append({"dt": "Webhook", "filters": [["name", "in", ["EB Wiki Update", "EB Wiki Trash"]]]})

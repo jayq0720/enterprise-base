@@ -17,6 +17,17 @@ class TestContract(FrappeTestCase):
         frappe.set_user("Administrator")
 
     def test_scope_and_duplicates(self):
+        for row in frappe.get_all(
+            "Custom DocPerm",
+            filters={"role": "EB Integration"},
+            fields=["read", "write", "create", "delete", "export"],
+        ):
+            self.assertEqual(
+                [row.read, row.write, row.create, row.delete, row.export], [1, 0, 0, 0, 0]
+            )
+        self.assertNotIn("Wiki User", frappe.get_roles("eb-x3@integration.invalid"))
+        if not frappe.db.exists("Warehouse Type", "Transit"):
+            frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert()
         company = frappe.get_doc(
             {
                 "doctype": "Company",
