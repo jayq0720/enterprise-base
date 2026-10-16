@@ -20,5 +20,6 @@ for site in contract.local import.local; do
     bench --site "$site" execute enterprise_base.integration.export_configuration
     bench --site "$site" execute enterprise_base.tests.probe.verify_user_migration
   fi
+  bench --site "$site" execute enterprise_base.tests.probe.verify_http_contract
 done
 echo '真实 Frappe 测试、配置导出及第二空站点导入完成。'
