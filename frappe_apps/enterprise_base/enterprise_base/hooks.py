@@ -41,7 +41,9 @@ has_permission = {"Employee": "enterprise_base.permissions.employee_access"}
 permission_query_conditions = {"Employee": "enterprise_base.permissions.employee_query"}
 doc_events["Employee"] = {"on_update": "enterprise_base.permissions.disable_left_user"}
 doc_events["Wiki Document"] = {"before_validate": "enterprise_base.permissions.wiki_review"}
-doc_events["Leave Application"] = {"validate": "enterprise_base.permissions.x4_draft"}
+doc_events["Leave Application"] = {"before_validate": "enterprise_base.permissions.x4_draft"}
+doc_events["Version"] = {"before_insert": "enterprise_base.permissions.redact_version"}
+doc_events["User"] = {"on_update": "enterprise_base.permissions.hr_scope"}
 fixtures.extend(
     [
         {"dt": "Custom DocPerm", "filters": [["role", "=", "EB Integration"]]},
@@ -61,6 +63,7 @@ fixtures.extend(
         },
     ]
 )
+fixtures.append({"dt": "Client Script", "filters": [["name", "=", "EB Employee Self Fields"]]})
 
 fixtures.append({"dt": "Webhook", "filters": [["name", "in", ["EB Wiki Update", "EB Wiki Trash"]]]})
 fixtures.extend(

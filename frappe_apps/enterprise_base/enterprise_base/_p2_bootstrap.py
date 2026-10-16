@@ -16,6 +16,24 @@ def rule(dt, role, level=0, **grants):
 
 
 def configure():
+    if not frappe.db.exists("Client Script", "EB Employee Self Fields"):
+        frappe.get_doc(
+            {
+                "doctype": "Client Script",
+                "name": "EB Employee Self Fields",
+                "dt": "Employee",
+                "view": "Form",
+                "enabled": 1,
+                "script": """frappe.ui.form.on('Employee', {refresh(frm) {
+  if (frm.doc.user_id === frappe.session.user && !frappe.user_roles.includes('HR Manager')) {
+    frm.fields.filter(f => f.df.permlevel === 1).forEach(f => {
+      frm.set_df_property(f.df.fieldname, 'permlevel', 0);
+      frm.set_df_property(f.df.fieldname, 'read_only', 1);
+    });
+  }
+}});""",
+            }
+        ).insert()
     for dt in (
         "Employee",
         "Designation",
