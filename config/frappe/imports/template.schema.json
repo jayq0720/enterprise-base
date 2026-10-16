@@ -7,28 +7,69 @@
     {
       "name": "部门",
       "columns": [
-        "名称",
-        "上级部门"
+        {
+          "name": "名称",
+          "required": true
+        },
+        {
+          "name": "上级部门",
+          "required": false,
+          "on_empty": "clear"
+        }
       ]
     },
     {
       "name": "岗位",
       "columns": [
-        "名称",
-        "岗位职责",
-        "可见的知识空间"
+        {
+          "name": "名称",
+          "required": true
+        },
+        {
+          "name": "岗位职责",
+          "required": true
+        },
+        {
+          "name": "可见的知识空间",
+          "required": false,
+          "on_empty": "clear"
+        }
       ]
     },
     {
       "name": "员工任职",
       "columns": [
-        "工号",
-        "姓名",
-        "企业微信 userid",
-        "部门",
-        "岗位",
-        "直属上级工号",
-        "入职日期"
+        {
+          "name": "工号",
+          "required": true
+        },
+        {
+          "name": "姓名",
+          "required": true
+        },
+        {
+          "name": "企业微信 userid",
+          "required": false,
+          "on_empty": "keep"
+        },
+        {
+          "name": "部门",
+          "required": true
+        },
+        {
+          "name": "岗位",
+          "required": true
+        },
+        {
+          "name": "直属上级工号",
+          "required": false,
+          "on_empty": "clear"
+        },
+        {
+          "name": "入职日期",
+          "required": false,
+          "on_empty": "keep"
+        }
       ]
     },
     {
@@ -41,5 +82,16 @@
         "示例"
       ]
     }
-  ]
+  ],
+  "on_empty_values": {
+    "keep": "留空不改系统里的原值",
+    "clear": "留空清空系统里的值"
+  },
+  "employee_match": {
+    "key": "工号",
+    "verify": [
+      "姓名"
+    ],
+    "on_mismatch": "reject_file"
+  }
 }
