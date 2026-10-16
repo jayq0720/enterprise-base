@@ -18,7 +18,7 @@ services:
     volumes: ["queue:/data"]
     healthcheck: {test: [CMD, redis-cli, ping], interval: 5s, timeout: 5s, retries: 30}
   create-site:
-    image: enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0
+    image: enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0
     pull_policy: never
     platform: linux/amd64
     profiles: [bootstrap]
@@ -32,7 +32,20 @@ services:
     command:
       - >-
         test -f "sites/$$SITE/site_config.json" || bench new-site "$$SITE" --db-root-username root --db-root-password "$$DB_ROOT_PASSWORD" --admin-password "$$ADMIN_PASSWORD" --mariadb-user-host-login-scope '%';
-        for app in erpnext hrms wiki; do bench --site "$$SITE" install-app "$$app"; done;
+        for app in erpnext hrms wiki enterprise_base; do bench --site "$$SITE" install-app "$$app"; done;
+        bench --site "$$SITE" migrate;
         bench --site "$$SITE" set-config host_name "$$SITE_URL";
         bench --site "$$SITE" execute frappe.db.set_single_value --args '["System Settings","enable_telemetry",0]' >/dev/null;
         bench --site "$$SITE" enable-scheduler
+  policy-sync:
+    image: ${EB_POLICY_SYNC_IMAGE:?需设置本仓库 CI 镜像摘要}
+    profiles: [policy-sync]
+    restart: unless-stopped
+    env_file: [{path: ./secrets/policy-sync.env, required: false}]
+    networks: [default, edge]
+    depends_on: {frontend: {condition: service_started}}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12

@@ -6,7 +6,7 @@ RUN = $(PYTHON) prepare.py
 EDGE = $(DOCKER) compose --env-file $(ENV) -f docker-compose.yml
 DIFY = $(DOCKER) compose --env-file secrets/dify.env -f data/dify/docker/eb-compose.yaml
 HR = $(DOCKER) compose --env-file $(ENV) -f data/frappe/eb-compose.yaml
-.PHONY: init prepare config verify build up wechat status down
+.PHONY: init prepare config verify build up wechat status down policy-sync
 init:
 	$(RUN) init
 prepare:
@@ -19,9 +19,10 @@ verify:
 	$(PYTHON) validate.py
 build: prepare
 	$(DOCKER) build --platform linux/amd64 -f data/frappe/images/custom/Containerfile --secret id=apps_json,src=apps.lock.json --build-arg FRAPPE_BRANCH=v15.123.1 --build-arg PYTHON_VERSION=3.12.12 --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0 data/frappe
+	$(DOCKER) build -f Frappe.Containerfile -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0 ../frappe_apps/enterprise_base
 up: config
 	$(RUN) check $(ENV)
-	$(DOCKER) image inspect enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0 >/dev/null 2>&1 || $(MAKE) build
+	$(DOCKER) image inspect enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0 >/dev/null 2>&1 || $(MAKE) build
 	$(EDGE) up -d --force-recreate caddy
 	$(DIFY) up -d --wait --wait-timeout 600
 	$(HR) up -d --wait --wait-timeout 600
@@ -32,8 +33,12 @@ wechat: prepare
 status:
 	$(EDGE) --profile wechat ps
 	$(DIFY) ps
-	$(HR) ps
+	$(HR) --profile policy-sync ps
 down:
-	$(HR) down
+	$(HR) --profile policy-sync down
 	$(DIFY) down
 	$(EDGE) --profile wechat down
+
+policy-sync: prepare
+	$(RUN) policy-sync $(ENV)
+	$(HR) --profile policy-sync up -d --wait --wait-timeout 300 policy-sync
