@@ -1,0 +1,9 @@
+{
+ "doctype": "Page",
+ "name": "eb-org-import",
+ "page_name": "eb-org-import",
+ "title": "组织任职导入",
+ "module": "Duties",
+ "standard": "Yes",
+ "roles": [{"role": "HR Manager"}, {"role": "System Manager"}]
+}
