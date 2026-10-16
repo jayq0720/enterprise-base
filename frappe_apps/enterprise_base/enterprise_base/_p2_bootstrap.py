@@ -6,8 +6,8 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 from frappe.permissions import rights, setup_custom_perms
 
 
-def rule(dt, role, level=0, **grants):
-    filters = {"parent": dt, "role": role, "permlevel": level, "if_owner": 0}
+def rule(dt, role, level=0, if_owner=0, **grants):
+    filters = {"parent": dt, "role": role, "permlevel": level, "if_owner": if_owner}
     name = frappe.db.get_value("Custom DocPerm", filters)
     doc = frappe.get_doc("Custom DocPerm", name) if name else frappe.new_doc("Custom DocPerm")
     doc.update(filters)
@@ -38,6 +38,8 @@ def configure():
         "Employee",
         "Designation",
         "Wiki Document",
+        "Wiki Revision",
+        "Wiki Revision Item",
         "EB Knowledge Space",
         "Leave Type",
         "Leave Application",
@@ -87,6 +89,9 @@ def configure():
     rule("EB Knowledge Space", "EB Integration", read=1)
     rule("Wiki Document", "HR User", read=1, write=1, create=1)
     rule("Wiki Document", "HR Manager", read=1, write=1, create=1, delete=1)
+    for dt in ("Wiki Revision", "Wiki Revision Item"):
+        for role in ("HR User", "HR Manager"):
+            rule(dt, role, if_owner=1, read=1, create=1, write=1)
     for dt in ("Employee", "Leave Type", "Leave Application"):
         rule(dt, "EB X4", read=1, create=int(dt == "Leave Application"))
     for name in ("EB Draft", "EB Review", "EB Published"):
@@ -142,6 +147,8 @@ def configure():
         "Employee",
         "Designation",
         "Wiki Document",
+        "Wiki Revision",
+        "Wiki Revision Item",
         "EB Knowledge Space",
         "Leave Type",
         "Leave Application",

@@ -67,10 +67,6 @@ fixtures.append({"dt": "Client Script", "filters": [["name", "=", "EB Employee S
 
 fixtures.append({"dt": "Webhook", "filters": [["name", "in", ["EB Wiki Update", "EB Wiki Trash"]]]})
 fixtures.extend(
-    {"dt": dt, "filters": [[field, "like", "EB %"]]}
-    for dt, field in [
-        ("Workflow", "name"),
-        ("Workflow State", "name"),
-        ("Workflow Action Master", "name"),
-    ]
+    {"dt": dt, "filters": [["name", "like", "EB %"]]}
+    for dt in ("Workflow", "Workflow State", "Workflow Action Master")
 )

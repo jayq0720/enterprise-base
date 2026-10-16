@@ -83,6 +83,8 @@ def export_configuration() -> None:
         "Designation",
         "EB Knowledge Space",
         "Wiki Document",
+        "Wiki Revision",
+        "Wiki Revision Item",
         "Leave Type",
         "Leave Application",
     ):
