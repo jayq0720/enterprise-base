@@ -1,5 +1,16 @@
-[
-  [["Child $id", "Root $id"], ["Root $id", ""]],
-  [["Job $id", "第一项\n第二项", ""]],
-  [["$id", "Import", "$id", "Child $id", "Job $id", "", "2026-10-01"]]
-]
+{
+  "rows": [
+    [["Child $id", "Root $id"], ["Root $id", ""]],
+    [["Job $id", "第一项\n第二项", ""]],
+    [["$id", "Import", "$id", "Child $id", "Job $id", "", "2026-10-01"]]
+  ],
+  "employee": {
+    "first_name": "Import", "user_id": null, "leave_approver": null,
+    "employee_number": "$id", "wecom_userid": "$id"
+  },
+  "user": {
+    "doctype": "User", "email": "org-import-$id@test.invalid", "first_name": "Import HR",
+    "enabled": 1, "send_welcome_email": 0, "user_type": "System User",
+    "roles": [{"role": "HR Manager"}]
+  }
+}
