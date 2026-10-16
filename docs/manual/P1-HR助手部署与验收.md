@@ -1,6 +1,6 @@
 # HR 助手部署与验收（P1-G7）
 
-本步骤用于独立测试环境，先按 [LOCAL.md](../../deploy/LOCAL.md) 完成 Frappe/Dify 初始化。X3/X4 放在 `frappe-services.yaml`：两者依赖 Frappe，与 X5 共用其默认网络，通过 edge 网络供 Dify API/worker/工作流代理访问。采用 `hr-assistant` profile，首次建站时不要求尚未生成的接口凭据；无宿主机端口，不添加 Caddy 路由。
+本步骤用于独立测试环境，先按 [LOCAL.md](../../deploy/LOCAL.md) 完成 Frappe/Dify 初始化。X3/X4 放在 `frappe-services.yaml`：两者依赖 Frappe，与 X5 共用其默认网络，Dify 只有 SSRF 代理进 edge 网络，HTTP 节点和 MCP 调用都经代理访问 X3/X4，Dify api/worker 不直连。采用 `hr-assistant` profile，首次建站时不要求尚未生成的接口凭据；无宿主机端口，不添加 Caddy 路由。
 
 ## 账号与启动
 
@@ -18,7 +18,9 @@ make hr-assistant
 make status
 ```
 
-`make hr-assistant` 先检查必填凭据、独立密钥和镜像摘要，再重建 Dify 的 ssrf_proxy/api/worker，最后等待 X3/X4 健康。只给工作流代理配置 `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS=kb-gateway,frappe-mcp`，不放行整段私网；Agent 代理不增加放行，Sandbox 仍在隔离网络。重建 Dify 进程会短暂中断在途请求，在测试环境先验证。
+`make hr-assistant` 先检查必填凭据、独立密钥和镜像摘要，再重建 Dify 的 ssrf_proxy，最后等待 X3/X4 健康。只给工作流代理配置 `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS=kb-gateway,frappe-mcp`，不放行整段私网；Agent 代理不增加放行，Sandbox 仍在隔离网络。重建代理会短暂中断在途的外部请求，在测试环境先验证。
+
+**升级 X3/X4/X5**：拉取新代码后在 `deploy/` 执行 `make init`，它会把 `secrets/.env` 里的三个镜像摘要改成新代码中的版本（密钥不动），再执行 `make policy-sync`、`make hr-assistant`。镜像摘要不要手工改成 PR 构建或浮动标签。
 
 `make prepare` 自动生成权限 600 的 `secrets/kb-gateway.env`、`secrets/frappe-mcp.env`；不要手工修改生成物。X3/X4 只收到各自的 API 凭据及 Token，X4 的 `EB_MCP_SESSION_SECRET` 只供服务签名，不填写到 Dify；`EB_MCP_ALLOWED_HOSTS` 固定为 `["frappe-mcp:8080"]`，不允许 localhost 通配符。GET /healthz 仅检查进程存活，凭据、权限和上游可用性还须联测。
 

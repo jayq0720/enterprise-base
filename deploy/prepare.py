@@ -62,7 +62,14 @@ if mode == "init":
             for key, value in defaults.items():
                 if key not in values:
                     target.write(f"\n{key}={secrets.token_urlsafe(32) if value == 'CHANGE_ME' else value}\n")
-    print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖。")
+        # 本仓库服务的镜像摘要随代码升级：重复 init 时改成 .env.example 中的版本，不动密钥和其它配置。
+        values = env("secrets/.env")
+        images = {k: v for k, v in env(".env.example").items() if k.startswith("EB_") and k.endswith("_IMAGE")}
+        if any(values.get(k) != v for k, v in images.items()):
+            values.update(images)
+            write("secrets/.env", "".join(f"{k}={v}\n" for k, v in values.items()))
+            print("已把 X3/X4/X5 镜像摘要更新为当前代码中的版本。")
+    print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖密钥。")
     sys.exit()
 settings = env(sys.argv[2] if mode in {"check", "wechat", "policy-sync", "hr-assistant"} else mode)
 try:
@@ -153,8 +160,8 @@ for name, svc in active.items():
     svc["volumes"] = mounts
 doc["networks"]["edge"] = edge
 active["nginx"]["networks"] = {"default": {}, "edge": {"aliases": ["dify"]}}
-for name in ("api", "worker", "ssrf_proxy"):
-    active[name]["networks"] = [*active[name].get("networks", ["default"]), "edge"]
+# Dify 的 HTTP 节点和 MCP 调用都经 ssrf_proxy 转发，只让代理进 edge，api/worker 不直连 Frappe、X3/X4/X5。
+active["ssrf_proxy"]["networks"] = [*active["ssrf_proxy"].get("networks", ["default"]), "edge"]
 # 仅工作流代理放行两个精确服务名，不扩大 Agent/Sandbox 的私网权限。
 active["ssrf_proxy"]["environment"].update(SSRF_PROXY_ALLOW_PRIVATE_DOMAINS="kb-gateway,frappe-mcp", SSRF_PROXY_ALLOW_PRIVATE_IPS="")
 write(dify / "eb-compose.yaml", yaml.safe_dump(doc, sort_keys=False))

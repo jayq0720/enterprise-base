@@ -45,5 +45,5 @@ policy-sync: prepare
 
 hr-assistant: prepare
 	$(RUN) hr-assistant $(ENV)
-	$(DIFY) up -d --force-recreate ssrf_proxy api worker
+	$(DIFY) up -d --force-recreate ssrf_proxy
 	$(HR) --profile hr-assistant up -d --wait --wait-timeout 300 kb-gateway frappe-mcp

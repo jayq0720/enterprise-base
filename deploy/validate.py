@@ -47,8 +47,10 @@ def audit(model, stack):
         key = services["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"]
         require(bool(re.fullmatch(r"[A-Za-z0-9_-]{43}", key))
                 and len(base64.urlsafe_b64decode(key + "=")) == 32, "Agent 密钥不是 32 字节无填充 base64url。")
-        require(all({"default", "ssrf_proxy_network", "edge"} == set(services[n]["networks"])
-                    for n in ("api", "worker", "ssrf_proxy")), "Dify 无法在内网访问 X3/X4。")
+        require({"default", "ssrf_proxy_network", "edge"} == set(services["ssrf_proxy"]["networks"]),
+                "Dify 代理无法在内网访问 X3/X4。")
+        require(all("edge" not in services[n]["networks"] for n in ("api", "worker")),
+                "Dify api/worker 不得直连 edge，须经 SSRF 代理访问 X3/X4。")
         proxy = services["ssrf_proxy"]["environment"]
         require(proxy["SSRF_PROXY_ALLOW_PRIVATE_DOMAINS"] == "kb-gateway,frappe-mcp"
                 and not proxy["SSRF_PROXY_ALLOW_PRIVATE_IPS"]
@@ -81,7 +83,7 @@ def audit(model, stack):
 
 
 def reject_mutations(model):
-    for defect in ("image", "ports", "volume", "nginx", "plugin_log", "worker_log", "agent_key", "proxy", "network"):
+    for defect in ("image", "ports", "volume", "nginx", "plugin_log", "worker_log", "agent_key", "proxy", "network", "direct"):
         bad = copy.deepcopy(model)
         api = bad["services"]["api"]
         if defect == "image":
@@ -100,8 +102,10 @@ def reject_mutations(model):
             bad["services"]["agent_backend"]["environment"]["DIFY_AGENT_SERVER_SECRET_KEY"] = "a" * 64
         elif defect == "proxy":
             bad["services"]["ssrf_proxy"]["environment"]["SSRF_PROXY_ALLOW_PRIVATE_IPS"] = "10.0.0.0/8"
+        elif defect == "network":
+            bad["services"]["ssrf_proxy"]["networks"].pop("edge")
         else:
-            api["networks"].pop("edge")
+            api["networks"]["edge"] = {}
         try:
             audit(bad, "dify")
         except RuntimeError:
@@ -176,6 +180,13 @@ def validate(work):
     values = settings(private)
     require(all(values[k] == v for k, v in original.items() if k not in upgraded),
             "补齐服务密钥时覆盖了已有配置。")
+    # 旧服务器上的镜像摘要过期时，重复 init 要改成当前代码的版本，且不动密钥。
+    stale = {**values, "EB_KB_GATEWAY_IMAGE": "ghcr.io/qianjie0720-sys/enterprise-base-kb-gateway@sha256:" + "0" * 64}
+    private.write_text("".join(f"{k}={v}\n" for k, v in stale.items()))
+    prepare("init")
+    require(settings(private) == {**values, "EB_KB_GATEWAY_IMAGE": settings(work / ".env.example")["EB_KB_GATEWAY_IMAGE"]},
+            "重复初始化未更新镜像摘要，或改动了其它配置。")
+    values = settings(private)
     secret_keys = [k for k, v in settings(work / ".env.example").items() if v == "CHANGE_ME"]
     require(len({values[k] for k in secret_keys}) == len(secret_keys), "服务未使用独立随机密钥。")
     for key in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN"):

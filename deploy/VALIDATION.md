@@ -15,8 +15,8 @@
 - Debian Nginx 的已核验摘要；插件守护进程 `WARN` 与 API/Celery `WARNING`；Agent 密钥解码后为 32 字节无填充 base64url。回退 Alpine、两种错误日志级别或旧 64 位密钥的反例必须失败。
 - 初始化重复执行不覆盖密钥，各服务密钥独立，文件 600/目录 700，生成输出不含密钥。
 - X5 两项密钥为 32 字节 base64url；旧配置补钥保留其它项。X5 无宿主机端口，Frappe 只获得签名密钥，专用 API 凭据缺项拒绝，镜像必须来自本仓库 CI 的摘要；使用 policy-sync profile 展开检查网络和环境变量。
-- X3/X4：hr-assistant profile 展开检查 main 镜像摘要、GET /healthz、无公开端口、独立凭据映射、仅指定 MCP Host；拒绝缺项、短 Token、复用账号/签名密钥、浮动镜像、缺网络和公开端口反例。新密钥补齐保留旧值，生成文件受 Git 忽略规则保护。
-- Dify API/worker/SSRF 代理加入 edge 并保留原网络；只有工作流代理放行 kb-gateway、frappe-mcp 两个精确服务名，私网 IP 放行为空，Agent 代理不增加域名放行，Sandbox 隔离保持不变。
+- X3/X4：hr-assistant profile 展开检查 main 镜像摘要、GET /healthz、无公开端口、独立凭据映射、仅指定 MCP Host；拒绝缺项、短 Token、复用账号/签名密钥、浮动镜像、缺网络和公开端口反例。新密钥补齐保留旧值，重复 init 把过期镜像摘要改成当前代码版本且不动密钥，生成文件受 Git 忽略规则保护。
+- 只有 Dify 的 SSRF 代理加入 edge 并保留原网络，api/worker 不进 edge（HTTP 节点和 MCP 调用都经代理）；api/worker 直连 edge 的反例必须被拒绝；只有工作流代理放行 kb-gateway、frappe-mcp 两个精确服务名，私网 IP 放行为空，Agent 代理不增加域名放行，Sandbox 隔离保持不变。
 - 缺少必填密钥、企业微信凭据缺失或缺整个键时拒绝；moving tag、额外端口、匿名卷三种反例必须被检查器拒绝。
 - Frappe 建站 shell 使用参数记录器替代 bench 执行，检查 `frappe.db.set_single_value` 收到 Single/字段名/整数 0，成功后才开启调度器；模拟设置失败时必须停止。该检查不运行 Frappe，实际数据库值和外联行为仍需运行验证。
 
