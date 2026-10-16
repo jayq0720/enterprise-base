@@ -32,3 +32,14 @@ fixtures = [
         ],
     },
 ]
+
+auth_hooks = ["enterprise_base.duties.access.restrict_integration"]
+fixtures.extend(
+    [
+        {"dt": "Custom DocPerm", "filters": [["role", "=", "EB Integration"]]},
+        {
+            "dt": "User",
+            "filters": [["name", "in", ["eb-x3@integration.invalid", "eb-x5@integration.invalid"]]],
+        },
+    ]
+)
