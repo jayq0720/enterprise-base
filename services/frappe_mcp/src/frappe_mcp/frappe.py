@@ -35,6 +35,7 @@ class Employee(BaseModel):
     employee_name: str
     # Frappe 用户（邮箱），只在内部用来找“待我审批”，不返回给模型
     user_id: str | None
+    designation: str | None = None
 
 
 class FrappeRejected(Exception):
@@ -59,6 +60,8 @@ class HR(Protocol):
 
     async def create_leave(self, doc: dict[str, Any]) -> str: ...
 
+    async def responsibilities(self, designation: str) -> str | None: ...
+
 
 class FrappeHR:
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
@@ -73,7 +76,7 @@ class FrappeHR:
         rows = await self._list(
             "Employee",
             [[self._s.frappe_wecom_field, "=", wecom_userid], ["status", "=", "Active"]],
-            ["name", "employee_name", "user_id"],
+            ["name", "employee_name", "user_id", "designation"],
             2,
         )
         if len(rows) != 1:
@@ -84,6 +87,7 @@ class FrappeHR:
             name=str(row["name"]),
             employee_name=str(row.get("employee_name") or ""),
             user_id=row.get("user_id") or None,
+            designation=row.get("designation") or None,
         )
 
     async def leave_balance(self, employee: str, on: datetime.date) -> dict[str, Any]:
@@ -128,6 +132,15 @@ class FrappeHR:
             raise _rejected(resp.json())
         resp.raise_for_status()
         return str(resp.json()["data"]["name"])
+
+    async def responsibilities(self, designation: str) -> str | None:
+        """岗位职责原文（X1 在 Designation 上加的富文本字段），岗位不存在返回 None。"""
+        rows = await self._list(
+            "Designation", [["name", "=", designation]], ["name", "eb_responsibilities"], 1
+        )
+        if not rows:
+            return None
+        return str(rows[0].get("eb_responsibilities") or "")
 
     async def _list(
         self,

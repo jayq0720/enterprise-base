@@ -25,9 +25,12 @@ def settings() -> Settings:
 class FakeHR:
     def __init__(self) -> None:
         self.employees = {
-            "zhangsan": Employee(name="E1", employee_name="张三", user_id="zs@example.com"),
+            "zhangsan": Employee(
+                name="E1", employee_name="张三", user_id="zs@example.com", designation="出纳"
+            ),
             "lisi": Employee(name="E2", employee_name="李四", user_id="ls@example.com"),
         }
+        self.duties = {"出纳": "<p>负责&nbsp;现金收付</p><ul><li>日记账</li><li>对账</li></ul>"}
         self.calls: list[tuple[str, object]] = []
         self.down = False
         self.reject: FrappeRejected | None = None
@@ -77,3 +80,7 @@ class FakeHR:
             raise self.reject
         self.created.append(doc)
         return "HR-LAP-9"
+
+    async def responsibilities(self, designation: str) -> str | None:
+        self.calls.append(("duties", designation))
+        return self.duties.get(designation)

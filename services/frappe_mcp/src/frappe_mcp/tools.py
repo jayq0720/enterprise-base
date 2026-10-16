@@ -1,7 +1,9 @@
 """MCP 工具的实现：先验会话令牌确定是谁，再只查这个人自己的数据。"""
 
 import datetime
+import html
 import logging
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -24,6 +26,10 @@ REJECTED = {
 }
 MAX_REASON = 140
 MAX_DAYS = 90
+NO_DESIGNATION = "你的员工档案里还没有岗位，请联系 HR 补上。"
+NO_DUTIES = "你的岗位还没有填写岗位职责，请联系 HR。"
+# 岗位职责是 HR 录的富文本，转成纯文本后最多给模型这么多字
+MAX_DUTIES = 3000
 
 
 class Tools:
@@ -78,6 +84,26 @@ class Tools:
             )
             items = [{**_leave(r), "applicant": r.get("employee_name") or ""} for r in rows]
             return {"employee_name": emp.employee_name, "applications": items}
+
+        return await self._as_user(session_token, run)
+
+    async def my_responsibilities(self, session_token: str) -> dict[str, Any]:
+        async def run(emp: Employee) -> dict[str, Any]:
+            if not emp.designation:
+                return {"employee_name": emp.employee_name, "error": NO_DESIGNATION}
+            text = _plain(await self._hr.responsibilities(emp.designation) or "")
+            if not text:
+                return {
+                    "employee_name": emp.employee_name,
+                    "designation": emp.designation,
+                    "error": NO_DUTIES,
+                }
+            return {
+                "employee_name": emp.employee_name,
+                "designation": emp.designation,
+                "responsibilities": text[:MAX_DUTIES],
+                "truncated": len(text) > MAX_DUTIES,
+            }
 
         return await self._as_user(session_token, run)
 
@@ -190,3 +216,16 @@ def _leave(r: dict[str, Any]) -> dict[str, Any]:
         "status": r.get("status") or "",
         "approver": r.get("leave_approver_name") or "",
     }
+
+
+_BREAK = re.compile(r"<\s*(br|/p|/li|/div|/h[1-6]|/tr)\b[^>]*>", re.I)
+_ITEM = re.compile(r"<\s*li\b[^>]*>", re.I)
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _plain(raw: str) -> str:
+    """富文本转纯文本：保留分段和列表，去掉标签和多余空行。"""
+    text = _ITEM.sub("- ", _BREAK.sub("\n", raw))
+    text = html.unescape(_TAG.sub("", text)).replace("\xa0", " ")
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
