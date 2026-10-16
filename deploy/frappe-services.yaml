@@ -49,3 +49,29 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+  kb-gateway:
+    image: ${EB_KB_GATEWAY_IMAGE:?需设置 X3 main CI 镜像摘要}
+    platform: linux/amd64
+    profiles: [hr-assistant]
+    restart: unless-stopped
+    env_file: [{path: ./secrets/kb-gateway.env, required: false}]
+    networks: [default, edge]
+    depends_on: {frontend: {condition: service_started}}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  frappe-mcp:
+    image: ${EB_FRAPPE_MCP_IMAGE:?需设置 X4 main CI 镜像摘要}
+    platform: linux/amd64
+    profiles: [hr-assistant]
+    restart: unless-stopped
+    env_file: [{path: ./secrets/frappe-mcp.env, required: false}]
+    networks: [default, edge]
+    depends_on: {frontend: {condition: service_started}}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12

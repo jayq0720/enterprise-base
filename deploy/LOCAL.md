@@ -13,6 +13,8 @@ make status
 ```
 `make init` 自动生成随机密钥，重复执行保留原值；所有密钥文件权限 600。环境文件仅支持 `KEY=单行值`，不写引号或变量展开。`make up` 首次用官方 frappe_docker 构建 HR 镜像；`make build` 可提前构建。构建失败可重试，勿删除数据卷。只有 HRMS、Wiki 作为附加功能安装；ERPNext 是 HRMS 官方必需依赖。
 
+HR 助手在建站、启用专用技术账号并录入凭据后，以 `make hr-assistant` 启动 X3/X4；X5 仍用 `make policy-sync`。旧环境先执行 `make init`，补齐新配置及三项独立随机密钥，不覆盖已有值。Dify 工具、应用导入及完整服务器验收见 [HR 助手部署与验收](../docs/manual/P1-HR助手部署与验收.md)。
+
 浏览器打开 `http://dify.localhost/install` 创建管理员，打开 `http://hr.localhost` 用 `Administrator` 和服务器 `secrets/.env` 中的 `EB_FRAPPE_ADMIN_PASSWORD` 登录。若系统不解析子域名，将 `dify.localhost hr.localhost wecom.localhost` 加入 hosts，指向 `127.0.0.1`。Frappe 的公司向导先用测试公司，真实组织配置在 G3/G4 导出 fixtures。
 
 `make prepare` 从仓库 `Caddyfile` 模板生成 `data/Caddyfile`，Compose 只读挂载生成文件。仅当实际端口绑定为 `127.0.0.1` 时移除 Dify/HR 的 `import admin_only`，依靠宿主机回环端口隔离；此时 Docker 将来源改写成网桥网关也能完成本机初始化。其他绑定一律启用白名单，包括内网地址和 IPv6 回环。不要把网桥网关加入白名单。每次改 `EB_BIND` 都通过 `make up` 重新生成、重建入口，不直接复用旧生成文件；`data/` 不提交。

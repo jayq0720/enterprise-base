@@ -6,7 +6,7 @@ RUN = $(PYTHON) prepare.py
 EDGE = $(DOCKER) compose --env-file $(ENV) -f docker-compose.yml
 DIFY = $(DOCKER) compose --env-file secrets/dify.env -f data/dify/docker/eb-compose.yaml
 HR = $(DOCKER) compose --env-file $(ENV) -f data/frappe/eb-compose.yaml
-.PHONY: init prepare config verify build up wechat status down policy-sync
+.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant
 init:
 	$(RUN) init
 prepare:
@@ -14,7 +14,7 @@ prepare:
 config: prepare
 	$(EDGE) --profile wechat config --quiet
 	$(DIFY) config --quiet
-	$(HR) --profile bootstrap config --quiet
+	$(HR) --profile bootstrap --profile policy-sync --profile hr-assistant config --quiet
 verify:
 	$(PYTHON) validate.py
 build: prepare
@@ -33,12 +33,17 @@ wechat: prepare
 status:
 	$(EDGE) --profile wechat ps
 	$(DIFY) ps
-	$(HR) --profile policy-sync ps
+	$(HR) --profile policy-sync --profile hr-assistant ps
 down:
-	$(HR) --profile policy-sync down
+	$(HR) --profile policy-sync --profile hr-assistant down
 	$(DIFY) down
 	$(EDGE) --profile wechat down
 
 policy-sync: prepare
 	$(RUN) policy-sync $(ENV)
 	$(HR) --profile policy-sync up -d --wait --wait-timeout 300 policy-sync
+
+hr-assistant: prepare
+	$(RUN) hr-assistant $(ENV)
+	$(DIFY) up -d --force-recreate ssrf_proxy
+	$(HR) --profile hr-assistant up -d --wait --wait-timeout 300 kb-gateway frappe-mcp
