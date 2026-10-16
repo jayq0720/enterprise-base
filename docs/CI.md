@@ -4,7 +4,7 @@
 
 | 检查 | 做什么 | 失败时怎么办 |
 | --- | --- | --- |
-| python | 对 `services/*/` 下每个有 `pyproject.toml` 的服务，跑 `ruff check`、`ruff format --check`、`mypy`、`pytest` | 在该服务目录里本地跑同样的命令修好 |
+| python | 对 `services/*/` 下每个有 `pyproject.toml` 的服务和 `tests/e2e/`（没配测试环境时用例全部跳过，只做静态检查），跑 `ruff check`、`ruff format --check`、`mypy`、`pytest` | 在该服务目录里本地跑同样的命令修好 |
 | python / 许可证 | 运行时依赖只允许 MIT、BSD、Apache、ISC、MPL-2.0、PSF、LGPL；出现 GPL、AGPL、SSPL 或未知许可证时失败 | 换依赖，或在 PR 里说明并请 JQ 决定 |
 | secrets | gitleaks 扫全部提交历史 | 删掉密钥、作废并更换该密钥；已推上去的密钥一律视为泄露 |
 | compose | 临时目录中生成入口、Dify、Frappe 完整配置，运行 Compose 校验及部署约束检查 | 本地执行 `make -C deploy verify`；修复生成器、版本锁或配置 |

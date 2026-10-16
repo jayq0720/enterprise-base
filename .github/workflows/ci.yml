@@ -17,9 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: list
-        # 每个 services/<name>/ 下有 pyproject.toml 的都是一个独立服务
+        # 每个 services/<name>/ 下有 pyproject.toml 的都是一个独立服务；端到端测试也按同样的方式检查
         run: |
-          services=$(find services -mindepth 2 -maxdepth 2 -name pyproject.toml -printf '%h\n' | sort | jq -R . | jq -sc .)
+          services=$( (find services -mindepth 2 -maxdepth 2 -name pyproject.toml -printf '%h\n'; echo tests/e2e) | sort | jq -R . | jq -sc .)
           echo "services=$services" >> "$GITHUB_OUTPUT"
 
   python:
