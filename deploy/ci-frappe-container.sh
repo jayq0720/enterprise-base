@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd /home/frappe/frappe-bench
-bench get-app --branch v15.64.3 --skip-assets https://github.com/frappe/hrms
-bench get-app --branch v3.4.0 --skip-assets https://github.com/frappe/wiki
+./env/bin/python -c 'import sys; assert sys.version_info >= (3, 12)'
 cp -r /workspace/frappe_apps/enterprise_base apps/enterprise_base
 ./env/bin/pip install -e apps/enterprise_base
 echo enterprise_base >> sites/apps.txt

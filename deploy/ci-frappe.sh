@@ -18,8 +18,18 @@ for attempt in {1..60}; do
   sleep 2
 done
 test "$ready" = true
+source_dir=$(mktemp -d)
+git -C "$source_dir" init
+git -C "$source_dir" remote add origin https://github.com/frappe/frappe_docker
+git -C "$source_dir" fetch --depth 1 origin 3556154478dffca8f3bcdee47d43b65d04a2c962
+git -C "$source_dir" checkout --detach FETCH_HEAD
+docker build -f "$source_dir/images/custom/Containerfile" --secret id=apps_json,src=deploy/apps.lock.json \
+  --build-arg FRAPPE_BRANCH=v15.123.1 --build-arg PYTHON_VERSION=3.12.12 \
+  --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 \
+  --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 \
+  -t eb-frappe-contract:0.1.0 "$source_dir"
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
-  -v "$PWD:/workspace:ro" frappe/erpnext:v15.123.0 /workspace/deploy/ci-frappe-container.sh
+  -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
