@@ -15,7 +15,8 @@ for site in contract.local import.local; do
   for app in hrms wiki enterprise_base; do bench --site "$site" install-app "$app"; done
   bench --site "$site" set-config allow_tests true
   bench --site "$site" execute frappe.db.set_single_value --args '["System Settings",{"language":"en","time_zone":"Asia/Shanghai","enable_telemetry":0}]'
-  bench --site "$site" run-tests --app enterprise_base --skip-test-records
+  # 官方 runner 仅在 CI 环境变量存在时才用退出码报告测试失败。
+  CI=true bench --site "$site" run-tests --app enterprise_base --skip-test-records
   if test "$site" = contract.local; then
     bench --site "$site" execute enterprise_base.integration.export_configuration
     bench --site "$site" execute enterprise_base.tests.probe.verify_user_migration
