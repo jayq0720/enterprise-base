@@ -1,0 +1,1193 @@
+# HR 助手（Dify Chatflow）。由 P2-C2 生成，说明见同目录 README.md。
+# 模型插件和 MCP 服务不在这里写死：导入前先装好通义千问插件并录入 Key，
+# 在“工具 → MCP”里添加 X4（服务标识填 eb-hr），导入后在“环境变量”里填地址和 Token。
+app:
+  description: 企业微信里的 HR 助手：问制度（按岗位检索，附出处）、查假期和请假进度、查待我审批、发起请假（员工确认后才提交）。
+  icon: 🧑‍💼
+  icon_background: '#E0F2FE'
+  icon_type: emoji
+  mode: advanced-chat
+  name: HR 助手
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables:
+  - description: 等待员工确认的请假草稿（X4 签名，10 分钟有效）
+    id: 6c1d7b9f-7a4f-4b1f-8b6a-2d4f4d3b3d01
+    name: leave_draft
+    selector:
+    - conversation
+    - leave_draft
+    value: ''
+    value_type: string
+  environment_variables:
+  - description: X3 按岗位检索服务的地址，例如 http://kb-gateway:8080
+    id: 5b0c6a8e-6f3e-4a0e-9a59-1c3f0e3c2a01
+    name: x3_url
+    selector:
+    - env
+    - x3_url
+    value: http://kb-gateway:8080
+    value_type: string
+  - description: X3 的服务间 Token（EB_KB_SERVICE_TOKEN），导入后在“环境变量”里填写，不进仓库
+    id: 5b0c6a8e-6f3e-4a0e-9a59-1c3f0e3c2a02
+    name: x3_token
+    selector:
+    - env
+    - x3_token
+    value: ''
+    value_type: secret
+  - description: X4 员工 HR 查询服务的地址，例如 http://frappe-mcp:8080
+    id: 6c1d7b9f-7a4f-4b1f-8b6a-2d4f4d3b3c01
+    name: x4_url
+    selector:
+    - env
+    - x4_url
+    value: http://frappe-mcp:8080
+    value_type: string
+  - description: X4 的服务间 Token（EB_MCP_SERVICE_TOKEN），导入后在“环境变量”里填写，不进仓库
+    id: 6c1d7b9f-7a4f-4b1f-8b6a-2d4f4d3b3c02
+    name: x4_token
+    selector:
+    - env
+    - x4_token
+    value: ''
+    value_type: secret
+  features:
+    file_upload: {}
+    opening_statement: 你好，我是 HR 助手。可以问我公司制度、查假期余额和请假进度，也可以帮你发起请假。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    nodes:
+    - id: start
+      type: custom
+      position:
+        x: 0
+        y: 300
+      data:
+        type: start
+        title: 开始
+        variables: []
+    - id: is_confirm
+      type: custom
+      position:
+        x: 300
+        y: 300
+      data:
+        type: if-else
+        title: 是不是确认请假
+        cases:
+        - case_id: 'true'
+          id: 'true'
+          logical_operator: and
+          conditions:
+          - id: q
+            variable_selector:
+            - sys
+            - query
+            comparison_operator: is
+            value: 确认请假
+            varType: string
+          - id: d
+            variable_selector:
+            - conversation
+            - leave_draft
+            comparison_operator: not empty
+            value: ''
+            varType: string
+        - case_id: no_draft
+          id: no_draft
+          logical_operator: and
+          conditions:
+          - id: q2
+            variable_selector:
+            - sys
+            - query
+            comparison_operator: is
+            value: 确认请假
+            varType: string
+    - id: a_no_draft
+      type: custom
+      position:
+        x: 600
+        y: -150
+      data:
+        type: answer
+        title: 没有草稿
+        answer: 没有等你确认的请假，或者草稿已经过期。请重新说一下要请什么假、哪几天。
+        variables: []
+    - id: confirm
+      type: custom
+      position:
+        x: 600
+        y: 0
+      data:
+        type: http-request
+        title: 提交请假
+        method: post
+        url: '{{#env.x4_url#}}/v1/leave/confirm'
+        authorization:
+          type: no-auth
+          config: null
+        headers: Authorization:Bearer {{#env.x4_token#}}
+        params: ''
+        body:
+          type: json
+          data:
+          - type: text
+            value: '{"user_id": "{{#sys.user_id#}}", "draft_token": "{{#conversation.leave_draft#}}"}'
+        timeout:
+          max_connect_timeout: 5
+          max_read_timeout: 15
+          max_write_timeout: 5
+        variables: []
+        retry_config:
+          max_retries: 1
+          retry_enabled: true
+          retry_interval: 500
+        error_strategy: default-value
+        default_value:
+        - key: status_code
+          type: number
+          value: 503
+        - key: body
+          type: string
+          value: ''
+        - key: headers
+          type: object
+          value: {}
+    - id: confirm_msg
+      type: custom
+      position:
+        x: 900
+        y: 0
+      data:
+        type: code
+        title: 提交结果
+        code_language: python3
+        code: |
+          import json
+
+
+          def main(status_code: int, body: str) -> dict:
+              """把 X4 的提交结果转成给员工的一句话。"""
+              if status_code != 200:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              try:
+                  data = json.loads(body)
+              except ValueError:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              return {"text": data.get("message") or data.get("error") or "HR 系统暂时不可用，请稍后再试。"}
+        variables:
+        - variable: status_code
+          value_selector:
+          - confirm
+          - status_code
+        - variable: body
+          value_selector:
+          - confirm
+          - body
+        outputs:
+          text:
+            type: string
+            children: null
+    - id: clear_draft
+      type: custom
+      position:
+        x: 1200
+        y: 0
+      data:
+        type: assigner
+        title: 清空草稿
+        version: '2'
+        items:
+        - variable_selector:
+          - conversation
+          - leave_draft
+          input_type: variable
+          operation: clear
+          value: null
+    - id: a_confirm
+      type: custom
+      position:
+        x: 1500
+        y: 0
+      data:
+        type: answer
+        title: 回复提交结果
+        answer: '{{#confirm_msg.text#}}'
+        variables: []
+    - id: session
+      type: custom
+      position:
+        x: 600
+        y: 300
+      data:
+        type: http-request
+        title: 换会话令牌
+        method: post
+        url: '{{#env.x4_url#}}/v1/session'
+        authorization:
+          type: no-auth
+          config: null
+        headers: Authorization:Bearer {{#env.x4_token#}}
+        params: ''
+        body:
+          type: json
+          data:
+          - type: text
+            value: '{"user_id": "{{#sys.user_id#}}"}'
+        timeout:
+          max_connect_timeout: 5
+          max_read_timeout: 10
+          max_write_timeout: 5
+        variables: []
+        retry_config:
+          max_retries: 1
+          retry_enabled: true
+          retry_interval: 500
+        error_strategy: default-value
+        default_value:
+        - key: status_code
+          type: number
+          value: 503
+        - key: body
+          type: string
+          value: ''
+        - key: headers
+          type: object
+          value: {}
+    - id: token
+      type: custom
+      position:
+        x: 900
+        y: 300
+      data:
+        type: code
+        title: 取令牌和日期
+        code_language: python3
+        code: |
+          import datetime
+          import json
+
+
+          def main(body: str) -> dict:
+              """取出会话令牌；顺便给出北京时间今天的日期，供起草请假时换算“明天”“下周一”。"""
+              today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+              try:
+                  token = json.loads(body).get("session_token", "")
+              except ValueError:
+                  token = ""
+              return {"token": token, "today": today.isoformat() + " 星期" + "一二三四五六日"[today.weekday()]}
+        variables:
+        - variable: body
+          value_selector:
+          - session
+          - body
+        outputs:
+          token:
+            type: string
+            children: null
+          today:
+            type: string
+            children: null
+    - id: intent
+      type: custom
+      position:
+        x: 1200
+        y: 300
+      data:
+        type: question-classifier
+        title: 判断意图
+        query_variable_selector:
+        - sys
+        - query
+        model: &id001
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        classes:
+        - id: policy
+          name: 问公司制度、规定、流程、福利政策
+        - id: balance
+          name: 查自己的假期余额、还有几天假
+        - id: my_leaves
+          name: 查自己的请假申请、请假批了没有
+        - id: approve
+          name: 查等自己审批的请假、有什么要我审批
+        - id: apply
+          name: 要请假、帮我请假、发起请假申请
+        - id: other
+          name: 其他，或者和以上都无关
+        instruction: 员工在企业微信里和 HR 助手对话，判断这句话属于哪一类。
+        instructions: ''
+        memory:
+          window:
+            enabled: true
+            size: 4
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            user: ''
+            assistant: ''
+        vision:
+          enabled: false
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        default_value:
+        - key: status_code
+          type: number
+          value: 503
+        - key: body
+          type: string
+          value: ''
+        - key: headers
+          type: object
+          value: {}
+        error_strategy: default-value
+        body:
+          data:
+          - type: text
+            value: '{"user_id": "{{#sys.user_id#}}", "query": "{{#sys.query#}}", "top_k": 5}'
+          type: json
+        headers: Authorization:Bearer {{#env.x3_token#}}
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 1
+          retry_enabled: true
+          retry_interval: 500
+        timeout:
+          max_connect_timeout: 5
+          max_read_timeout: 15
+          max_write_timeout: 5
+        title: 按岗位检索
+        type: http-request
+        url: '{{#env.x3_url#}}/v1/search'
+        variables: []
+      id: p_x3
+      position:
+        x: 1500
+        y: 800
+      type: custom
+    - data:
+        code: |
+          import json
+
+
+          def main(status_code: int, body: str) -> dict:
+              """把 X3 的检索结果整理成模型上下文和出处列表。"""
+              unavailable = "知识库检索暂时不可用，请稍后再试。"
+              if status_code != 200:
+                  return {"has_records": 0, "context": "", "refs": "", "notice": unavailable}
+              try:
+                  data = json.loads(body)
+              except ValueError:
+                  return {"has_records": 0, "context": "", "refs": "", "notice": unavailable}
+              records = data.get("records") or []
+              if not records:
+                  notice = data.get("notice") or "没有找到相关制度。可以换个说法再问，或联系 HR。"
+                  return {"has_records": 0, "context": "", "refs": "", "notice": notice}
+              blocks, refs, seen = [], [], []
+              for i, r in enumerate(records, 1):
+                  title = r.get("title", "")
+                  blocks.append(f"[{i}]《{title}》（{r.get('space', '')}）\n{r.get('content', '')}")
+                  if title not in seen:
+                      seen.append(title)
+                      refs.append(f"[{i}]《{title}》")
+              return {
+                  "has_records": 1,
+                  "context": "\n\n".join(blocks),
+                  "refs": "\n".join(refs),
+                  "notice": "",
+              }
+        code_language: python3
+        outputs:
+          context:
+            children: null
+            type: string
+          has_records:
+            children: null
+            type: number
+          notice:
+            children: null
+            type: string
+          refs:
+            children: null
+            type: string
+        title: 整理检索结果
+        type: code
+        variables:
+        - value_selector:
+          - p_x3
+          - status_code
+          variable: status_code
+        - value_selector:
+          - p_x3
+          - body
+          variable: body
+      id: p_fmt
+      position:
+        x: 1800
+        y: 800
+      type: custom
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: '='
+            id: has-records
+            value: '1'
+            varType: number
+            variable_selector:
+            - p_fmt
+            - has_records
+          id: 'true'
+          logical_operator: and
+        title: 有没有检索到
+        type: if-else
+      id: p_check
+      position:
+        x: 2100
+        y: 800
+      type: custom
+    - data:
+        answer: '{{#p_fmt.notice#}}'
+        title: 告知原因
+        type: answer
+        variables: []
+      id: p_notice
+      position:
+        x: 2400
+        y: 950
+      type: custom
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 4
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: system
+          role: system
+          text: |
+            你是公司的制度问答助手。只根据下面“检索到的制度”回答员工的问题。
+
+            规则：
+            1. 只用检索到的内容回答，不要补充制度里没有的规定，也不要猜测。
+            2. 每个要点后面用 [编号] 标注出处，编号对应下面的条目。
+            3. 检索到的内容不足以回答时，直接说“现有制度里没有找到明确规定，建议咨询 HR”。
+            4. 不要透露或推测任何人的手机号、身份证号、银行卡号、薪资等个人信息。
+            5. 用简洁的中文回答。
+
+            检索到的制度：
+            {{#p_fmt.context#}}
+        selected: false
+        title: 制度问答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      id: p_llm
+      position:
+        x: 2400
+        y: 700
+      type: custom
+    - data:
+        answer: |-
+          {{#p_llm.text#}}
+
+          出处：
+          {{#p_fmt.refs#}}
+        title: 回复
+        type: answer
+        variables: []
+      id: p_answer
+      position:
+        x: 2700
+        y: 700
+      type: custom
+    - id: t_balance
+      type: custom
+      position:
+        x: 1500
+        y: 900
+      data:
+        type: tool
+        title: 查假期余额
+        provider_id: eb-hr
+        provider_name: eb-hr
+        provider_type: mcp
+        tool_name: leave_balance
+        tool_label: leave_balance
+        tool_configurations: {}
+        tool_parameters:
+          session_token:
+            type: mixed
+            value: '{{#token.token#}}'
+        error_strategy: default-value
+        default_value:
+        - key: text
+          type: string
+          value: ''
+        - key: json
+          type: array[object]
+          value: []
+    - id: f_balance
+      type: custom
+      position:
+        x: 1800
+        y: 900
+      data:
+        type: code
+        title: 整理结果
+        code_language: python3
+        code: |
+          def main(out: list) -> dict:
+              """把 X4 的结果整理成给员工看的文字。"""
+              data = out[0] if out else {}
+              if not data:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              if data.get("error"):
+                  return {"text": data["error"]}
+              rows = data.get("balances") or []
+              if not rows:
+                  return {"text": "你目前没有可用的假期额度。"}
+              lines = [f"{data.get('employee_name', '')}的假期余额："]
+              for r in rows:
+                  lines.append(
+                      f"· {r['leave_type']}：剩余 {('%g' % (r.get('remaining') or 0))} 天"
+                      f"（总额 {('%g' % (r.get('total') or 0))}，已休 {('%g' % (r.get('taken') or 0))}，审批中 {('%g' % (r.get('pending_approval') or 0))}）"
+                  )
+              return {"text": "\n".join(lines)}
+        variables:
+        - variable: out
+          value_selector:
+          - t_balance
+          - json
+        outputs:
+          text:
+            type: string
+            children: null
+    - id: a_balance
+      type: custom
+      position:
+        x: 2100
+        y: 900
+      data:
+        type: answer
+        title: 回复
+        answer: '{{#f_balance.text#}}'
+        variables: []
+    - id: t_my_leaves
+      type: custom
+      position:
+        x: 1500
+        y: 1100
+      data:
+        type: tool
+        title: 查我的请假
+        provider_id: eb-hr
+        provider_name: eb-hr
+        provider_type: mcp
+        tool_name: my_leave_applications
+        tool_label: my_leave_applications
+        tool_configurations: {}
+        tool_parameters:
+          session_token:
+            type: mixed
+            value: '{{#token.token#}}'
+        error_strategy: default-value
+        default_value:
+        - key: text
+          type: string
+          value: ''
+        - key: json
+          type: array[object]
+          value: []
+    - id: f_my_leaves
+      type: custom
+      position:
+        x: 1800
+        y: 1100
+      data:
+        type: code
+        title: 整理结果
+        code_language: python3
+        code: |
+          def main(out: list) -> dict:
+              """把 X4 的结果整理成给员工看的文字。"""
+              data = out[0] if out else {}
+              if not data:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              if data.get("error"):
+                  return {"text": data["error"]}
+              rows = data.get("applications") or []
+              if not rows:
+                  return {"text": "你最近没有请假申请。"}
+              status = {"Open": "审批中", "Approved": "已批准", "Rejected": "已驳回", "Cancelled": "已取消"}
+              lines = ["你最近的请假申请："]
+              for r in rows:
+                  approver = f"，审批人 {r['approver']}" if r.get("approver") else ""
+                  lines.append(
+                      f"· {r['leave_type']} {r['from_date']} 至 {r['to_date']}，{('%g' % (r.get('days') or 0))} 天，"
+                      f"{status.get(r.get('status'), r.get('status'))}{approver}（{r['id']}）"
+                  )
+              return {"text": "\n".join(lines)}
+        variables:
+        - variable: out
+          value_selector:
+          - t_my_leaves
+          - json
+        outputs:
+          text:
+            type: string
+            children: null
+    - id: a_my_leaves
+      type: custom
+      position:
+        x: 2100
+        y: 1100
+      data:
+        type: answer
+        title: 回复
+        answer: '{{#f_my_leaves.text#}}'
+        variables: []
+    - id: t_approve
+      type: custom
+      position:
+        x: 1500
+        y: 1300
+      data:
+        type: tool
+        title: 查待我审批
+        provider_id: eb-hr
+        provider_name: eb-hr
+        provider_type: mcp
+        tool_name: pending_my_approval
+        tool_label: pending_my_approval
+        tool_configurations: {}
+        tool_parameters:
+          session_token:
+            type: mixed
+            value: '{{#token.token#}}'
+        error_strategy: default-value
+        default_value:
+        - key: text
+          type: string
+          value: ''
+        - key: json
+          type: array[object]
+          value: []
+    - id: f_approve
+      type: custom
+      position:
+        x: 1800
+        y: 1300
+      data:
+        type: code
+        title: 整理结果
+        code_language: python3
+        code: |
+          def main(out: list) -> dict:
+              """把 X4 的结果整理成给员工看的文字。"""
+              data = out[0] if out else {}
+              if not data:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              if data.get("error"):
+                  return {"text": data["error"]}
+              rows = data.get("applications") or []
+              if not rows:
+                  return {"text": "目前没有等你审批的请假申请。"}
+              lines = [f"有 {len(rows)} 条请假申请等你审批（请到 HR 系统里审批）："]
+              for r in rows:
+                  lines.append(
+                      f"· {r.get('applicant', '')}：{r['leave_type']} {r['from_date']} 至 {r['to_date']}，"
+                      f"{('%g' % (r.get('days') or 0))} 天（{r['id']}）"
+                  )
+              return {"text": "\n".join(lines)}
+        variables:
+        - variable: out
+          value_selector:
+          - t_approve
+          - json
+        outputs:
+          text:
+            type: string
+            children: null
+    - id: a_approve
+      type: custom
+      position:
+        x: 2100
+        y: 1300
+      data:
+        type: answer
+        title: 回复
+        answer: '{{#f_approve.text#}}'
+        variables: []
+    - id: extract
+      type: custom
+      position:
+        x: 1500
+        y: 1500
+      data:
+        type: parameter-extractor
+        title: 提取请假信息
+        model: *id001
+        query:
+        - sys
+        - query
+        reasoning_mode: prompt
+        parameters:
+        - name: leave_type
+          type: string
+          required: true
+          description: 假期类型名称，例如 年假、病假、事假
+        - name: from_date
+          type: string
+          required: true
+          description: 开始日期，YYYY-MM-DD
+        - name: to_date
+          type: string
+          required: true
+          description: 结束日期，YYYY-MM-DD；只请一天时和开始日期相同
+        - name: reason
+          type: string
+          required: false
+          description: 请假事由，没说就留空
+        instruction: 今天是 {{#token.today#}}。把“明天”“下周一”这类说法换算成具体日期。只提取员工本人说的内容，不要替他编造。
+        memory:
+          window:
+            enabled: true
+            size: 4
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            user: ''
+            assistant: ''
+        vision:
+          enabled: false
+    - id: t_draft
+      type: custom
+      position:
+        x: 1800
+        y: 1500
+      data:
+        type: tool
+        title: 起草请假
+        provider_id: eb-hr
+        provider_name: eb-hr
+        provider_type: mcp
+        tool_name: draft_leave
+        tool_label: draft_leave
+        tool_configurations: {}
+        tool_parameters:
+          session_token:
+            type: mixed
+            value: '{{#token.token#}}'
+          leave_type:
+            type: mixed
+            value: '{{#extract.leave_type#}}'
+          from_date:
+            type: mixed
+            value: '{{#extract.from_date#}}'
+          to_date:
+            type: mixed
+            value: '{{#extract.to_date#}}'
+          reason:
+            type: mixed
+            value: '{{#extract.reason#}}'
+        error_strategy: default-value
+        default_value:
+        - key: text
+          type: string
+          value: ''
+        - key: json
+          type: array[object]
+          value: []
+    - id: f_draft
+      type: custom
+      position:
+        x: 2100
+        y: 1500
+      data:
+        type: code
+        title: 整理草稿
+        code_language: python3
+        code: |
+          def main(out: list) -> dict:
+              """把 X4 的结果整理成给员工看的文字。"""
+              data = out[0] if out else {}
+              if not data:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。", "draft_token": ""}
+              if data.get("error"):
+                  types = "、".join(data.get("leave_types") or [])
+                  hint = f"可选的假期类型：{types}。" if types else ""
+                  return {"text": data["error"] + hint, "draft_token": ""}
+              d = data["draft"]
+              left = data.get("remaining")
+              left_text = f"，目前剩余 {'%g' % left} 天" if left is not None else ""
+              reason = f"，事由：{d['reason']}" if d.get("reason") else ""
+              text = (
+                  f"请核对请假信息：{d['leave_type']}，{d['from_date']} 至 {d['to_date']}{reason}{left_text}。\n"
+                  "确认无误请回复“确认请假”，10 分钟内有效；有不对的地方直接重新说。"
+              )
+              return {"text": text, "draft_token": data["draft_token"]}
+        variables:
+        - variable: out
+          value_selector:
+          - t_draft
+          - json
+        outputs:
+          text:
+            type: string
+            children: null
+          draft_token:
+            type: string
+            children: null
+    - id: save_draft
+      type: custom
+      position:
+        x: 2400
+        y: 1500
+      data:
+        type: assigner
+        title: 保存草稿
+        version: '2'
+        items:
+        - variable_selector:
+          - conversation
+          - leave_draft
+          input_type: variable
+          operation: over-write
+          value:
+          - f_draft
+          - draft_token
+    - id: a_draft
+      type: custom
+      position:
+        x: 2700
+        y: 1500
+      data:
+        type: answer
+        title: 回复草稿
+        answer: '{{#f_draft.text#}}'
+        variables: []
+    - id: a_other
+      type: custom
+      position:
+        x: 1500
+        y: 1700
+      data:
+        type: answer
+        title: 说明能做什么
+        answer: |-
+          我可以帮你：
+          · 回答公司制度问题
+          · 查假期余额、自己的请假进度、等你审批的请假
+          · 发起请假（会先给你核对，回复“确认请假”才提交）
+        variables: []
+    edges:
+    - data:
+        sourceType: if-else
+        targetType: answer
+      id: is_confirm-no_draft-a_no_draft
+      source: is_confirm
+      sourceHandle: no_draft
+      target: a_no_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: p_x3-source-p_fmt
+      source: p_x3
+      sourceHandle: source
+      target: p_fmt
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: if-else
+      id: p_fmt-source-p_check
+      source: p_fmt
+      sourceHandle: source
+      target: p_check
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: p_check-true-p_llm
+      source: p_check
+      sourceHandle: 'true'
+      target: p_llm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: answer
+      id: p_check-false-p_notice
+      source: p_check
+      sourceHandle: 'false'
+      target: p_notice
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: p_llm-source-p_answer
+      source: p_llm
+      sourceHandle: source
+      target: p_answer
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: http-request
+      id: intent-policy-p_x3
+      source: intent
+      sourceHandle: policy
+      target: p_x3
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: tool
+      id: intent-balance-t_balance
+      source: intent
+      sourceHandle: balance
+      target: t_balance
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: tool
+        targetType: code
+      id: t_balance-source-f_balance
+      source: t_balance
+      sourceHandle: source
+      target: f_balance
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: f_balance-source-a_balance
+      source: f_balance
+      sourceHandle: source
+      target: a_balance
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: tool
+      id: intent-my_leaves-t_my_leaves
+      source: intent
+      sourceHandle: my_leaves
+      target: t_my_leaves
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: tool
+        targetType: code
+      id: t_my_leaves-source-f_my_leaves
+      source: t_my_leaves
+      sourceHandle: source
+      target: f_my_leaves
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: f_my_leaves-source-a_my_leaves
+      source: f_my_leaves
+      sourceHandle: source
+      target: a_my_leaves
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: tool
+      id: intent-approve-t_approve
+      source: intent
+      sourceHandle: approve
+      target: t_approve
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: tool
+        targetType: code
+      id: t_approve-source-f_approve
+      source: t_approve
+      sourceHandle: source
+      target: f_approve
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: f_approve-source-a_approve
+      source: f_approve
+      sourceHandle: source
+      target: a_approve
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: parameter-extractor
+      id: intent-apply-extract
+      source: intent
+      sourceHandle: apply
+      target: extract
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: parameter-extractor
+        targetType: tool
+      id: extract-source-t_draft
+      source: extract
+      sourceHandle: source
+      target: t_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: tool
+        targetType: code
+      id: t_draft-source-f_draft
+      source: t_draft
+      sourceHandle: source
+      target: f_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: assigner
+      id: f_draft-source-save_draft
+      source: f_draft
+      sourceHandle: source
+      target: save_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: assigner
+        targetType: answer
+      id: save_draft-source-a_draft
+      source: save_draft
+      sourceHandle: source
+      target: a_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: answer
+      id: intent-other-a_other
+      source: intent
+      sourceHandle: other
+      target: a_other
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: start
+        targetType: if-else
+      id: start-source-is_confirm
+      source: start
+      sourceHandle: source
+      target: is_confirm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: is_confirm-true-confirm
+      source: is_confirm
+      sourceHandle: 'true'
+      target: confirm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: confirm-source-confirm_msg
+      source: confirm
+      sourceHandle: source
+      target: confirm_msg
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: assigner
+      id: confirm_msg-source-clear_draft
+      source: confirm_msg
+      sourceHandle: source
+      target: clear_draft
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: assigner
+        targetType: answer
+      id: clear_draft-source-a_confirm
+      source: clear_draft
+      sourceHandle: source
+      target: a_confirm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: is_confirm-false-session
+      source: is_confirm
+      sourceHandle: 'false'
+      target: session
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: session-source-token
+      source: session
+      sourceHandle: source
+      target: token
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: question-classifier
+      id: token-source-intent
+      source: token
+      sourceHandle: source
+      target: intent
+      targetHandle: target
+      type: custom
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.6
+  rag_pipeline_variables: []

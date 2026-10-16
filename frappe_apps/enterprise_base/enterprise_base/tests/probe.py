@@ -1,5 +1,7 @@
 """仅测试站点：验证官方导入不会重置已配置的技术账号。"""
 
+import json
+
 import frappe
 from frappe.utils.fixtures import sync_fixtures
 
@@ -74,6 +76,51 @@ def verify_http_contract() -> None:
                 raise RuntimeError(
                     f"真实 HTTP {path} 状态码 {response.status_code}，应为 {expected}。"
                 )
+        # X5 同步制度时按这几种方式读 Wiki：按名字查空间根节点、按 lft/rgt 查页面、读单页。
+        wiki.reload()
+        if not wiki.get("root_group"):
+            raise RuntimeError("Wiki Space 未生成 root_group，X5 无法定位页面。")
+        root = frappe.db.get_value("Wiki Document", wiki.root_group, ["lft", "rgt"], as_dict=True)
+        for path, params, expected in (
+            (
+                "/api/resource/Wiki Space",
+                {
+                    "filters": json.dumps([["name", "=", wiki.name]]),
+                    "fields": '["root_group"]',
+                    "limit_page_length": "0",
+                },
+                200,
+            ),
+            (
+                "/api/resource/Wiki Document",
+                {
+                    "filters": json.dumps(
+                        [
+                            ["lft", ">", root.lft],
+                            ["rgt", "<", root.rgt],
+                            ["is_group", "=", 0],
+                            ["is_published", "=", 1],
+                        ]
+                    ),
+                    "fields": '["name"]',
+                    "limit_page_length": "0",
+                },
+                200,
+            ),
+            (f"/api/resource/Wiki Document/{wiki.root_group}", {}, 200),
+        ):
+            response = client.get(path, query_string=params, headers=headers)
+            if response.status_code != expected:
+                raise RuntimeError(
+                    f"真实 HTTP {path} 状态码 {response.status_code}，应为 {expected}。"
+                )
+        response = client.put(
+            f"/api/resource/Wiki Document/{wiki.root_group}",
+            json={"content": "x"},
+            headers=headers,
+        )
+        if response.status_code != 403:
+            raise RuntimeError(f"真实 HTTP 改 Wiki 页面状态码 {response.status_code}，应为 403。")
         response = client.get(
             "/api/method/enterprise_base.duties.api.knowledge_spaces", headers={"Host": site}
         )

@@ -135,3 +135,13 @@ class TestContract(FrappeTestCase):
                         restrict_integration()
         finally:
             frappe.local.request, frappe.local.form_dict = old_request, old_form
+
+    def test_hr_manager_maintains_spaces(self):
+        # 权限复核表：制度和知识空间由 HR 管理员维护，不必找系统管理员。
+        rows = {
+            p.role: p for p in frappe.get_meta("EB Knowledge Space").permissions if p.permlevel == 0
+        }
+        self.assertTrue(
+            all(rows["HR Manager"].get(r) for r in ("read", "write", "create", "delete"))
+        )
+        self.assertFalse(any(rows["EB Integration"].get(r) for r in ("write", "create", "delete")))

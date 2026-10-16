@@ -54,6 +54,13 @@
       "delete": 1
     },
     {
+      "role": "HR Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    },
+    {
       "role": "EB Integration",
       "read": 1
     }
