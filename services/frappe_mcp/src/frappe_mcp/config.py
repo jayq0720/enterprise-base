@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     # 会话令牌的签名密钥，和服务 Token 分开
     mcp_session_secret: SecretStr = Field(min_length=32)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    # 请假草稿多久内可以确认
+    draft_ttl_seconds: int = Field(default=600, ge=60, le=3600)
 
     frappe_url: HttpUrl
     frappe_api_key: SecretStr

@@ -1,8 +1,10 @@
 import datetime
+from typing import Any
 
 from frappe_mcp import session
 from frappe_mcp.config import Settings
-from frappe_mcp.tools import NO_EMPLOYEE, UNAVAILABLE, Tools
+from frappe_mcp.frappe import FrappeRejected
+from frappe_mcp.tools import NO_EMPLOYEE, REJECTED, UNAVAILABLE, Tools
 
 from .conftest import SECRET, FakeHR
 
@@ -67,3 +69,67 @@ async def test_frappe_down(settings: Settings) -> None:
     tools, hr = make(settings)
     hr.down = True
     assert await tools.leave_balance(tok("zhangsan")) == {"error": UNAVAILABLE}
+
+
+async def draft(tools: Tools, uid: str = "zhangsan", **kw: str) -> dict[str, Any]:
+    args = {"leave_type": "年假", "from_date": "2026-11-02", "to_date": "2026-11-03", **kw}
+    return await tools.draft_leave(tok(uid), **args)
+
+
+async def test_draft_does_not_write_and_binds_identity(settings: Settings) -> None:
+    tools, hr = make(settings)
+    out = await draft(tools, reason="家里有事")
+    assert out["draft"] == {
+        "leave_type": "年假",
+        "from_date": "2026-11-02",
+        "to_date": "2026-11-03",
+        "reason": "家里有事",
+    }
+    assert out["remaining"] == 3 and hr.created == []
+    # 别人拿到张三的草稿也提交不了
+    assert (await tools.confirm_leave("lisi", out["draft_token"]))["ok"] is False
+    done = await tools.confirm_leave("zhangsan", out["draft_token"])
+    assert done["ok"] is True and done["id"] == "HR-LAP-9"
+    assert hr.created == [
+        {
+            "employee": "E1",
+            "leave_type": "年假",
+            "from_date": "2026-11-02",
+            "to_date": "2026-11-03",
+            "description": "家里有事（企业微信助手提交）",
+            "posting_date": "2026-10-16",
+        }
+    ]
+
+
+async def test_draft_validates_input(settings: Settings) -> None:
+    tools, _ = make(settings)
+    assert "YYYY-MM-DD" in (await draft(tools, from_date="11月2日"))["error"]
+    assert "早于" in (await draft(tools, to_date="2026-11-01"))["error"]
+    assert "90" in (await draft(tools, to_date="2027-03-01"))["error"]
+    bad = await draft(tools, leave_type="婚假")
+    assert bad["leave_types"] == ["年假", "病假"]
+    assert "error" in await draft(tools, uid="nobody")
+
+
+async def test_confirm_rejects_tampered_or_session_token(settings: Settings) -> None:
+    tools, hr = make(settings)
+    out = await draft(tools)
+    payload, sig = out["draft_token"].split(".")
+    assert (await tools.confirm_leave("zhangsan", payload + "x." + sig))["ok"] is False
+    assert (await tools.confirm_leave("zhangsan", tok("zhangsan")))["ok"] is False
+    assert hr.created == []
+
+
+async def test_confirm_maps_frappe_errors(settings: Settings) -> None:
+    tools, hr = make(settings)
+    out = await draft(tools)
+    hr.reject = FrappeRejected("OverlapError", "Employee E1 has already applied")
+    res = await tools.confirm_leave("zhangsan", out["draft_token"])
+    assert res == {"ok": False, "error": REJECTED["OverlapError"]}
+    hr.reject = FrappeRejected("ValidationError", "Leave date is in a holiday")
+    assert "holiday" in (await tools.confirm_leave("zhangsan", out["draft_token"]))["error"]
+    hr.reject = None
+    hr.down = True
+    res = await tools.confirm_leave("zhangsan", out["draft_token"])
+    assert res == {"ok": False, "error": UNAVAILABLE}

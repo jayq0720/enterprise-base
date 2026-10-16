@@ -30,3 +30,12 @@ def test_tampered_payload_or_other_key_rejected() -> None:
         session.verify(KEY, forged, now=1000)
     with pytest.raises(session.SessionError):
         session.verify(b"x" * 32, token, now=1000)
+
+
+def test_draft_and_session_not_interchangeable() -> None:
+    draft = session.sign(KEY, session.LEAVE_DRAFT, {"uid": "zhangsan"}, 600, now=1000)
+    with pytest.raises(session.SessionError):
+        session.verify(KEY, draft, now=1000)
+    token = session.issue(KEY, "zhangsan", 900, now=1000)
+    with pytest.raises(session.SessionError):
+        session.unsign(KEY, session.LEAVE_DRAFT, token, now=1000)
