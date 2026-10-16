@@ -57,5 +57,14 @@ def export_configuration() -> None:
                     enabled=0, enable_security=0
                 )  # 空库安全导入，after_sync 再注入实际密钥。
             if row["doctype"] == "User":
+                keep = {"doctype", "name", "email", "first_name", "user_type", "roles"}
+                for key in set(row) - keep:
+                    row.pop(key)
                 row.update(enabled=0, send_welcome_email=0)
-        path.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+        target = path
+        if path.name == "user.json":
+            # 原生 fixtures 会删除重建 User，不能让迁移清空 API Key 或重新禁用已启用账号。
+            target = folder.parent / "setup_fixtures/user.json"
+            target.parent.mkdir(exist_ok=True)
+            path.unlink()
+        target.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")

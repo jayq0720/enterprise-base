@@ -18,6 +18,7 @@ for site in contract.local import.local; do
   bench --site "$site" run-tests --app enterprise_base --skip-test-records
   if test "$site" = contract.local; then
     bench --site "$site" execute enterprise_base.integration.export_configuration
+    bench --site "$site" execute enterprise_base.tests.probe.verify_user_migration
   fi
 done
 echo '真实 Frappe 测试、配置导出及第二空站点导入完成。'
