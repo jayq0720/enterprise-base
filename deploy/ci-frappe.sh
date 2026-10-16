@@ -43,7 +43,7 @@ docker run --name eb-frappe --network eb-contract --entrypoint bash \
   >/tmp/eb-frappe-test.log 2>&1 || {
     tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 100; exit 1;
   }
-tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting' || true
+tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting|越权拒绝通过|不重置技术账号' || true
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/

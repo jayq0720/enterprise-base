@@ -9,12 +9,6 @@
         "parent": "eb-x3@integration.invalid",
         "parentfield": "roles",
         "parenttype": "User",
-        "role": "Wiki User"
-      },
-      {
-        "parent": "eb-x3@integration.invalid",
-        "parentfield": "roles",
-        "parenttype": "User",
         "role": "EB Integration"
       }
     ],
@@ -28,12 +22,6 @@
     "first_name": "X5",
     "name": "eb-x5@integration.invalid",
     "roles": [
-      {
-        "parent": "eb-x5@integration.invalid",
-        "parentfield": "roles",
-        "parenttype": "User",
-        "role": "Wiki User"
-      },
       {
         "parent": "eb-x5@integration.invalid",
         "parentfield": "roles",
