@@ -1,10 +1,12 @@
-name: policy-image
+# X3、X4、X5 三个服务的镜像。PR 上只构建，确认 Dockerfile 能用；只有合入 main 的代码才推到 GHCR，
+# 部署只用 main 构建的摘要（Actions 产物 <服务>-image 里）。
+name: service-images
 on:
   pull_request:
-    paths: ['services/policy_sync/**', '.github/workflows/policy-image.yml']
+    paths: ['services/**', '.github/workflows/service-images.yml']
   push:
     branches: [main]
-    paths: ['services/policy_sync/**', '.github/workflows/policy-image.yml']
+    paths: ['services/**', '.github/workflows/service-images.yml']
 permissions:
   contents: read
   packages: write  # 只有 push 到 main 的发布步骤会用到
@@ -12,17 +14,23 @@ jobs:
   image:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {dir: policy_sync, name: policy-sync}
+          - {dir: kb_gateway, name: kb-gateway}
+          - {dir: frappe_mcp, name: frappe-mcp}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      # PR 上只构建，确认 Dockerfile 能用；只有合入 main 的代码才推到 GHCR，部署只用 main 构建的摘要。
       - name: 构建镜像
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}-policy-sync"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-${{ matrix.name }}"
           source=$(git rev-parse HEAD)
           docker build --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
-            -t "$image:sha-$source" services/policy_sync
+            -t "$image:sha-$source" services/${{ matrix.dir }}
           echo "image=$image:sha-$source" >> "$GITHUB_ENV"
       - name: 发布固定提交镜像（仅 main）
         if: github.event_name == 'push'
@@ -32,10 +40,10 @@ jobs:
           echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker push "$image"
           mkdir -p artifacts
-          docker image inspect "$image" --format '{{index .RepoDigests 0}}' > artifacts/policy-image.txt
+          docker image inspect "$image" --format '{{index .RepoDigests 0}}' > artifacts/${{ matrix.name }}-image.txt
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
-          name: policy-image
-          path: artifacts/policy-image.txt
+          name: ${{ matrix.name }}-image
+          path: artifacts/${{ matrix.name }}-image.txt
           retention-days: 3
