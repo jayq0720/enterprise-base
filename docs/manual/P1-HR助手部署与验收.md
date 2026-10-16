@@ -31,9 +31,20 @@ make status
 1. 工具 → MCP → 添加：地址 `http://frappe-mcp:8080/mcp/`，**服务标识必须填 `eb-hr`**，认证请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`，值从服务器密钥文件读取，仅在后台录入。保存并确认能发现工具。X4 升级新增工具后，在同一 MCP 服务点击“更新”。以后修改这个 MCP 服务的地址或 Token，保存后工具会显示未授权，要先点“授权”，再点“更新”，否则工作流调用工具会失败。
 2. 工作室 → 创建应用 → 导入 DSL，选择仓库 `config/dify/hr-assistant.yml`。
 3. 应用 → 环境变量：`x3_url=http://kb-gateway:8080`、`x4_url=http://frappe-mcp:8080`；`x3_token` 填服务器 `EB_KB_SERVICE_TOKEN`，`x4_token` 填 `EB_MCP_SERVICE_TOKEN`，两项保持 secret 类型。
-4. 检查模型节点选用已配置的国产模型、MCP 节点绑定 eb-hr，发布应用。在“API 访问”生成应用 Key；接企业微信时将其填入服务器 `DIFY_API_KEY`，再按 LOCAL.md 运行 `make wechat`。
+4. 检查模型节点选用已配置的国产模型、MCP 节点绑定 eb-hr，发布应用。
+5. 按下节分别关闭“HR 助手”和“制度问答”的网页版，确认两者均已停用。
+6. 保持“API 访问”开启，在其中生成 HR 助手应用 Key；接企业微信时将其填入服务器 `DIFY_API_KEY`，再按 LOCAL.md 运行 `make wechat`。
 
 用有 Active Employee、岗位和 wecom_userid 的测试员工调用应用，`user` 必须是该员工企业微信 userid，流程从 `sys.user_id` 取身份；控制台预览的管理员身份不能替代。分别问“我的岗位职责是什么”“我还有几天年假”，核对本人岗位职责及余额，再用无岗位、无员工、错误 Token 的身份确认拒绝。不要在聊天/PR 粘贴真实 userid、员工内容、Key 或完整运行详情。
+
+## 关闭 HR 助手和制度问答的网页版
+
+首次发布后、接入企业微信前执行。员工入口统一使用企业微信，身份取企业微信 userid；Dify 分享网页的访客身份不能替代它。即使“制度问答”只保留作测试，也要关闭其网页版。
+
+1. Dify 工作室 → 打开“HR 助手”→“访问点”，找到 **Web App** 卡片，关闭开关，确认状态为已停用。对“制度问答”执行同样操作；如尚未导入该应用，导入并发布后立即执行。刷新管理页面，确认两项开关仍为关闭。
+2. **API 访问保持开启**，供 dify-on-wechat 调用；不用删除应用、撤销发布或停用整个 Dify 服务。该操作对应官方独立的 `enable_site=false`，不修改 `enable_api`。界面依据为[锁定版本的 Web App 开关](https://github.com/langgenius/dify/blob/8387590ace4a094de812b7847fc6a4c3a27cd52b/web/app/components/app/access-point/built-in-access-points/web-app-card.tsx)。
+3. 从 Caddy 管理员白名单内、能正常到达 Dify 的浏览器，分别检查两个应用原有分享链接：用无痕窗口打开，并刷新关闭前已经打开的聊天页、尝试发送一条合成测试消息，均应无法发起新的对话请求。仅看到 Caddy 的 403 不算应用已停用，不能只靠隐藏链接判断。再按上节以测试员工 userid 经 Service API（企业微信接好后再经企业微信）调用 HR 助手，确认仍能正常响应。
+4. 每次重新导入、复制应用或升级 Dify 后复查。回传只记录两个 Web App 开关状态、分享入口拒绝及 API 调用通过/失败，不记录真实分享链接、userid、凭据或员工内容。当前仅补充部署步骤，实际开关及访问结果待测试环境执行。
 
 ## 服务器验收与回传
 

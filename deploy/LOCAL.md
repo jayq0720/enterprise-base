@@ -46,7 +46,7 @@ make status
 不删除 `data/`、命名卷或其它密钥。`make up` 重新生成配置、拉取固定摘要的 Debian Nginx；全局日志保持 `WARNING`，仅插件守护进程用 `WARN`，不要在环境文件把全局改成 `WARN`。站点已经创建时仍会重试应用安装、遥测设置和调度器开启；遥测使用数据库 Single 接口，避免未完成公司向导时触发必填校验。步骤依据 [Claude 实测记录](../docs/p0-results/P0-本地实测-Claude.md)。JQ 转交的 2026-10-15 晚复核确认：四项启动修复在 main e686aa1 从零初始化成功，用时 5 分钟（镜像已缓存）；本次回环入口修复仍须单独进行 Docker 回归。
 
 ## 企业微信入口
-在 Dify 后台创建 Chatflow，API Key 只填进服务器 `secrets/.env` 的 `DIFY_API_KEY`；填写该文件所有 `WECHAT*` 项，AES Key 为企业微信后台给出的 43 位值，Agent ID 用纯数字。然后：
+在 Dify 后台创建并发布 Chatflow 后，先按[关闭网页版步骤](../docs/manual/P1-HR助手部署与验收.md#关闭-hr-助手和制度问答的网页版)分别关闭“HR 助手”和“制度问答”的 Web App，保持 API 访问开启。API Key 只填进服务器 `secrets/.env` 的 `DIFY_API_KEY`；填写该文件所有 `WECHAT*` 项，AES Key 为企业微信后台给出的 43 位值，Agent ID 用纯数字。然后：
 ```sh
 make wechat
 ```
