@@ -21,7 +21,7 @@ class TestOrgImport(FrappeTestCase):
                 frappe.get_doc(row).insert()
         self.suffix = frappe.generate_hash(length=8)
         employee = data["employee"]
-        employee.update(first_name="Import", user_id=None)
+        employee.update(first_name="Import", user_id=None, leave_approver=None)
         employee.update(employee_number=self.suffix, wecom_userid=self.suffix)
         self.emp = frappe.get_doc(employee).insert()
         self.rows = json.loads(

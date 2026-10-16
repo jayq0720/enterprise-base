@@ -182,7 +182,8 @@ def prepare(company, rows, errors):
 
 @frappe.whitelist(methods=["POST"])
 def import_workbook(file_url, company, save=False):
-    frappe.only_for(["HR Manager", "System Manager"])
+    if not (set(frappe.get_roles()) & {"HR Manager", "System Manager"}):
+        frappe.throw("仅 HR Manager/System Manager 可以导入。", frappe.PermissionError)
     frappe.get_doc("Company", company).check_permission("read")
     file = frappe.get_doc("File", {"file_url": file_url})
     file.check_permission("read")
