@@ -20,7 +20,9 @@ for site in contract.local import.local; do
   if test "$site" = contract.local; then
     bench --site "$site" execute enterprise_base.integration.export_configuration
     bench --site "$site" execute enterprise_base.tests.probe.verify_user_migration
+    echo '已确认 fixture 导入不重置技术账号凭据。'
   fi
   bench --site "$site" execute enterprise_base.tests.probe.verify_http_contract
+  echo "$site：真实 HTTP 认证、允许字段与越权拒绝通过。"
 done
 echo '真实 Frappe 测试、配置导出及第二空站点导入完成。'
