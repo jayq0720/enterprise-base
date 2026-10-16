@@ -148,8 +148,18 @@ def validate(work):
     output += prepare("init")
     require(private.read_bytes() == before, "重复初始化覆盖了密钥。")
     values = settings(private)
+    original = dict(values)
+    private.write_text("".join(f"{k}={v}\n" for k, v in values.items()
+                               if k not in {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN"}))
+    prepare("init")
+    values = settings(private)
+    require(all(values[k] == v for k, v in original.items() if not k.startswith("EB_SYNC_")),
+            "补齐 X5 密钥时覆盖了已有配置。")
     secret_keys = [k for k, v in settings(work / ".env.example").items() if v == "CHANGE_ME"]
     require(len({values[k] for k in secret_keys}) == len(secret_keys), "服务未使用独立随机密钥。")
+    for key in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN"):
+        require(len(base64.urlsafe_b64decode(values[key] + "=")) == 32 and "=" not in values[key],
+                "X5 密钥必须是 32 字节无填充 base64url。")
     prepare("check", "secrets/.env")
     prepare("check", ".env.example", success=False)
     malformed = work / "secrets/malformed.env"
@@ -159,8 +169,17 @@ def validate(work):
         prepare(str(malformed), success=False)
     malformed.unlink()
     prepare("wechat", "secrets/.env", success=False)
+    prepare("policy-sync", "secrets/.env", success=False)
     # 缺失整个配置项也必须拒绝，不能只检查已有键。
     incomplete = work / "secrets/incomplete.env"
+    policy = dict(values)
+    api_keys = ("EB_SYNC_FRAPPE_API_KEY", "EB_SYNC_FRAPPE_API_SECRET", "EB_SYNC_DIFY_DATASET_API_KEY")
+    policy.update({key: "synthetic-test-value" for key in api_keys})
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in policy.items()))
+    prepare("policy-sync", str(incomplete))
+    for missing in api_keys:
+        incomplete.write_text("".join(f"{k}={v}\n" for k, v in policy.items() if k != missing))
+        prepare("policy-sync", str(incomplete), success=False)
     incomplete.write_text("\n".join(f"{k}={'synthetic-test-value' if k.startswith('WECHAT') or k == 'DIFY_API_KEY' else v}"
                                      for k, v in values.items()) + "\n")
     prepare("wechat", str(incomplete))
@@ -187,6 +206,8 @@ def validate(work):
             command = [*COMPOSE, "--env-file", environment, "-f", file]
             if profile:
                 command += ["--profile", profile]
+            if stack == "frappe":
+                command += ["--profile", "policy-sync"]
             run([*command, "config", "--quiet"], work)
             rendered = run([*command, "config", "--format", "json"], work)
             model = json.loads(rendered)
@@ -232,6 +253,15 @@ def validate(work):
                 require(services["frontend"]["environment"]["FRAPPE_SITE_NAME_HEADER"] == f"hr.{domain}",
                         "Frappe 站点域名未传递。")
                 require("edge" not in services["backend"]["networks"], "Frappe 后端直接接入入口网络。")
+                sync = services["policy-sync"]
+                require(not sync.get("ports") and set(sync["networks"]) == {"default", "edge"},
+                        "X5 端口或网络边界错误。")
+                require(sync["environment"]["EB_FRAPPE_URL"] == "http://frontend:8080"
+                        and sync["environment"]["EB_DIFY_API_BASE"] == "http://dify/v1"
+                        and sync["environment"]["EB_SYNC_WEBHOOK_SECRET"] == values["EB_SYNC_WEBHOOK_SECRET"],
+                        "X5 内网地址或签名密钥未正确传递。")
+                require(services["create-site"]["environment"]["EB_SYNC_WEBHOOK_SECRET"]
+                        == values["EB_SYNC_WEBHOOK_SECRET"], "Frappe 未得到签名密钥。")
                 check_bootstrap(services["create-site"], work)
             print(f"{project}/{stack}：配置通过，镜像固定、数据卷命名、端口边界正确。")
     print("四类启动兼容性反例被拒绝；建站参数与失败停止检查通过。")
@@ -251,6 +281,9 @@ def main():
         config = Path(temp) / "config/dify-on-wechat"
         config.mkdir(parents=True)
         shutil.copyfile(ROOT.parent / "config/dify-on-wechat/config.json", config / "config.json")
+        sync = Path(temp) / "services/policy_sync"
+        sync.mkdir(parents=True)
+        shutil.copyfile(ROOT.parent / "services/policy_sync/.env.example", sync / ".env.example")
         reuse_source_cache(work, json.loads((work / "upstream.lock.json").read_text()))
         validate(work)
     print("隔离校验结束；未启动容器，未读写现有部署密钥或运行数据。")
