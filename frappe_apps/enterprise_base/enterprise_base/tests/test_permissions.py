@@ -18,6 +18,7 @@ EMPLOYEE_API = "/api/resource/Employee"
 class TestPermissions(FrappeTestCase):
     def test_permissions_http(self):
         site = frappe.local.site
+        frappe.db.set_single_value("System Settings", "allow_error_traceback", 0)
         data = json.loads(Path(__file__).with_name("p2_data.json").read_text())
         for row in data["records"]:
             if not frappe.db.exists(row["doctype"], row.get("name")):
@@ -150,6 +151,7 @@ class TestPermissions(FrappeTestCase):
                 "/api/resource/Leave Application",
                 json={**data["leave"], "employee": employee},
             )["data"]
+            self.assertEqual((leave["docstatus"], leave["status"]), (0, "Open"))
             leave_path = "/api/resource/Leave Application/" + leave["name"]
             for dt, query in data["x4_reads"].items():
                 request("x4", "GET", "/api/resource/" + dt, query_string=query)

@@ -1,0 +1,1 @@
+原生导出来源：[CI 38869804482](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38869804482)，2026-10-16 07:58 UTC，ZIP SHA256 `06e0a3e1c222fc04ae835a287a702a5d13aa3c058a335a5d0e3b1ea9532cc0f2`；此处与 App 对应配置逐字一致，随安装/迁移同步。 采用原生 Workflow 留下制度审核轨迹，并用 App 校验发布标记；账号默认禁用且无密钥。角色配置、复现步骤和五项实测见 [PR #23](https://github.com/qianjie0720-sys/enterprise-base/pull/23)；X5 实收和企业微信最终回复待部署后联测。
