@@ -75,7 +75,6 @@
     "eb_national_id",
     "bank_name",
     "bank_ac_no",
-    "iban",
     "salary_mode",
     "salary_currency",
     "ctc",
@@ -116,11 +115,11 @@
     "send_welcome_email": 0
   },
   "restricted_query": {
-    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"iban\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]"
+    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]"
   },
   "export_query": {
     "doctype": "Employee",
-    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"iban\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]",
+    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]",
     "file_format_type": "CSV"
   },
   "private_samples": [

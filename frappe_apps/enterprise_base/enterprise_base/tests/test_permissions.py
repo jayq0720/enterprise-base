@@ -97,7 +97,7 @@ class TestPermissions(FrappeTestCase):
             ):
                 row = request(label, "GET", EMPLOYEE_API + "/" + target)["data"]
                 for field in data["sensitive"]:
-                    self.assertEqual(field in row, allowed, f"{label} 敏感字段读取边界失败")
+                    self.assertEqual(field in row, allowed, f"{label} {field} 读取边界失败")
             request("staff", "GET", EMPLOYEE_API + "/" + hr_employee, 403)
             request("hr", "PUT", path, 403, json={"user_id": "p2-hr@test.invalid"})
             request("hr", "PUT", space_path, 403, json={"visible_to_all": 1})

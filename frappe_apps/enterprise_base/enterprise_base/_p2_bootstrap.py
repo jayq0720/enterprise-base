@@ -62,7 +62,6 @@ def configure():
         "eb_national_id",
         "bank_name",
         "bank_ac_no",
-        "iban",
         "salary_mode",
         "salary_currency",
         "ctc",
