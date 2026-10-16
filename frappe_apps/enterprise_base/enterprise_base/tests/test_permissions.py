@@ -70,15 +70,12 @@ class TestPermissions(FrappeTestCase):
         def headers(label):
             return {
                 "Host": site,
-                "Accept": "application/json",
                 "Authorization": f"token synthetic-p2-{label}:synthetic-p2-secret",
             }
 
         def request(label, method, path, expected=200, **kwargs):
             response = client.open(path, method=method, headers=headers(label), **kwargs)
-            self.assertEqual(
-                response.status_code, expected, f"{label} {method} {path}：{response.status_code}"
-            )
+            self.assertEqual(response.status_code, expected, f"{label} {method} {path}")
             return response.get_json() or {}
 
         def restore():
@@ -90,12 +87,8 @@ class TestPermissions(FrappeTestCase):
             path = EMPLOYEE_API + "/" + employee
             space_path = "/api/resource/EB Knowledge Space/" + knowledge.name
             wiki_path = "/api/resource/Wiki Document/" + page.name
-            for label, target, allowed in (
-                ("hr", employee, False),
-                ("manager", employee, True),
-                ("staff", employee, True),
-                ("hr", hr_employee, True),
-            ):
+            for label, target, allowed in data["employee_reads"]:
+                target = employee if target == "staff" else hr_employee
                 row = request(label, "GET", EMPLOYEE_API + "/" + target)["data"]
                 for field in data["sensitive"]:
                     if allowed and field in data["employee"]:
@@ -106,6 +99,7 @@ class TestPermissions(FrappeTestCase):
             request("hr", "PUT", path, 403, json={"user_id": "p2-hr@test.invalid"})
             request("hr", "PUT", space_path, 403, json={"visible_to_all": 1})
             request("manager", "PUT", space_path, json={"visible_to_all": 1})
+            request("manager", "GET", data["position_path"])
             exported = request("hr", "GET", EMPLOYEE_API, query_string=data["restricted_query"])[
                 "data"
             ]
@@ -157,8 +151,12 @@ class TestPermissions(FrappeTestCase):
                 json={**data["leave"], "employee": employee},
             )["data"]
             leave_path = "/api/resource/Leave Application/" + leave["name"]
+            for dt, query in data["x4_reads"].items():
+                request("x4", "GET", "/api/resource/" + dt, query_string=query)
             request("x4", "PUT", leave_path, 403, json={"docstatus": 1})
             request("x4", "DELETE", leave_path, 403)
+            for query in data["x4_joins"]:
+                request("x4", "GET", "/api/resource/Leave Application", 403, query_string=query)
             request("x4", "GET", path, 403)
             request("x4", "GET", EMPLOYEE_API, 403, query_string=data["x4_sensitive_query"])
             request("manager", "PUT", path, json={"status": "Left", "relieving_date": "2026-10-16"})

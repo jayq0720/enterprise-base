@@ -79,16 +79,8 @@ def export_configuration() -> None:
     previous = frappe.conf.get("developer_mode")
     try:
         frappe.conf.developer_mode = 1
-        for dt in (
-            "Employee",
-            "Designation",
-            "EB Knowledge Space",
-            "Wiki Document",
-            "Wiki Revision",
-            "Wiki Revision Item",
-            "Leave Type",
-            "Leave Application",
-        ):
+        for source in (folder.parent / "duties/custom").glob("*.json"):
+            dt = json.loads(source.read_text())["doctype"]
             path = export_customizations("Duties", dt, sync_on_migrate=True, with_permissions=True)
             copyfile(path, folder.parent / "setup_fixtures" / ("p2_" + Path(path).name))
     finally:

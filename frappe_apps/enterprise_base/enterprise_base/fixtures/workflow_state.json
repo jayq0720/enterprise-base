@@ -1,0 +1,29 @@
+[
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.696925",
+    "name": "EB Draft",
+    "style": "",
+    "workflow_state_name": "EB Draft"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.697787",
+    "name": "EB Review",
+    "style": "",
+    "workflow_state_name": "EB Review"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.698613",
+    "name": "EB Published",
+    "style": "",
+    "workflow_state_name": "EB Published"
+  }
+]

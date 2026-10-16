@@ -82,6 +82,7 @@ def configure():
         "Int",
         validate_fields_for_doctype=False,
     )
+    rule("Designation", "HR Manager", read=1, write=1)
     rule("Designation", "HR Manager", 1, read=1, write=1)
     frappe.db.delete("Custom DocPerm", {"parent": "EB Knowledge Space"})
     rule("EB Knowledge Space", "HR Manager", read=1, write=1, create=1, delete=1)

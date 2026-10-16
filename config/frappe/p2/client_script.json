@@ -1,0 +1,13 @@
+[
+  {
+    "docstatus": 0,
+    "doctype": "Client Script",
+    "dt": "Employee",
+    "enabled": 1,
+    "modified": "2026-10-16 13:15:01.412776",
+    "module": null,
+    "name": "EB Employee Self Fields",
+    "script": "frappe.ui.form.on('Employee', {refresh(frm) {\n  if (frm.doc.user_id === frappe.session.user && !frappe.user_roles.includes('HR Manager')) {\n    frm.fields.filter(f => f.df.permlevel === 1).forEach(f => {\n      frm.set_df_property(f.df.fieldname, 'permlevel', 0);\n      frm.set_df_property(f.df.fieldname, 'read_only', 1);\n    });\n  }\n}});",
+    "view": "Form"
+  }
+]

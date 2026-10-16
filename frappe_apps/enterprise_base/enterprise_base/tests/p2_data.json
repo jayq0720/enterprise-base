@@ -23,6 +23,11 @@
       "name": "Transit"
     },
     {
+      "doctype": "Designation",
+      "name": "P2 Synthetic Position",
+      "designation_name": "P2 Synthetic Position"
+    },
+    {
       "doctype": "Company",
       "name": "P2 Synthetic",
       "company_name": "P2 Synthetic",
@@ -130,5 +135,51 @@
   ],
   "x4_sensitive_query": {
     "fields": "[\"cell_number\"]"
-  }
+  },
+  "x4_joins": [
+    {
+      "fields": "[\"employee.date_of_birth\"]"
+    },
+    {
+      "fields": "[\"name\"]",
+      "filters": "[[\"employee.date_of_birth\",\"=\",\"2000-01-01\"]]"
+    },
+    {
+      "fields": "[\"name\"]",
+      "order_by": "employee.date_of_birth desc"
+    }
+  ],
+  "x4_reads": {
+    "Leave Type": {
+      "fields": "[\"name\"]",
+      "order_by": "name asc"
+    },
+    "Leave Application": {
+      "fields": "[\"name\", \"employee_name\", \"leave_type\", \"from_date\", \"to_date\", \"total_leave_days\", \"status\", \"leave_approver_name\", \"posting_date\"]",
+      "order_by": "from_date desc"
+    }
+  },
+  "employee_reads": [
+    [
+      "hr",
+      "staff",
+      false
+    ],
+    [
+      "manager",
+      "staff",
+      true
+    ],
+    [
+      "staff",
+      "staff",
+      true
+    ],
+    [
+      "hr",
+      "hr",
+      true
+    ]
+  ],
+  "position_path": "/api/resource/Designation/P2 Synthetic Position"
 }

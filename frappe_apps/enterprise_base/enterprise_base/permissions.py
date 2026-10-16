@@ -26,11 +26,8 @@ class Employee(EmployeeMaster):
             (self.get(f) or "") != ((old.get(f) or "") if old else "")
             for f in ("user_id", "wecom_userid")
         )
-        if (
-            changed
-            and frappe.session.user != "Administrator"
-            and "HR Manager" not in frappe.get_roles()
-        ):
+        manager = frappe.session.user == "Administrator" or "HR Manager" in frappe.get_roles()
+        if changed and not manager:
             frappe.throw("员工身份关联只能由 HR Manager 维护。", frappe.PermissionError)
         super().validate()
 
@@ -104,12 +101,9 @@ def wiki_review(doc, method=None):
 
 
 def x4_draft(doc, method=None):
-    if (
-        frappe.session.user != "Administrator"
-        and "EB X4" in frappe.get_roles()
-        and (not doc.is_new() or doc.docstatus or doc.status != "Open")
-    ):
-        frappe.throw("X4 仅能新建未提交、未审批的请假草稿。", frappe.PermissionError)
+    if frappe.session.user != "Administrator" and "EB X4" in frappe.get_roles():
+        if not doc.is_new() or doc.docstatus or doc.status != "Open":
+            frappe.throw("X4 仅能新建未提交、未审批的请假草稿。", frappe.PermissionError)
 
 
 def x4_api():
@@ -121,17 +115,22 @@ def x4_api():
     allowed = method == "GET" and path.removeprefix("/api/method/") in X4_METHODS
     if parts[:3] == ["", "api", "resource"] and len(parts) in (4, 5):
         dt = parts[3]
-        allowed = method == "GET" and dt in {"Employee", "Leave Type", "Leave Application"}
-        if dt == "Employee" and allowed:
+        allowed = method == "POST" and dt == "Leave Application" and len(parts) == 4
+        if method == "GET" and dt in {"Employee", "Leave Type", "Leave Application"}:
             try:
-                fields = json.loads(form.get("fields") or "[]")
+                fields = json.loads(form.get("fields") or '["name"]')
                 filters = json.loads(form.get("filters") or "[]")
             except (TypeError, ValueError):
                 fields, filters = [], []
-            allowed = len(parts) == 4 and isinstance(fields, list) and bool(fields)
-            allowed = allowed and all(
-                isinstance(f, str) and f in {"name", "employee_name", "user_id", "wecom_userid"}
-                for f in fields
+            columns = (
+                {"name", "employee_name", "user_id", "wecom_userid"}
+                if dt == "Employee"
+                else set(frappe.get_meta(dt).get_valid_columns())
+            )
+            allowed = (
+                isinstance(fields, list)
+                and bool(fields)
+                and all(isinstance(f, str) and f in columns for f in fields)
             )
             allowed = (
                 allowed
@@ -139,17 +138,26 @@ def x4_api():
                 and all(
                     isinstance(f, list)
                     and len(f) == 3
-                    and f[0] in ("wecom_userid", "status", "name", "user_id")
-                    and f[1] == "="
-                    and isinstance(f[2], str)
+                    and isinstance(f[0], str)
+                    and f[0] in (columns | {"status"})
+                    and (dt != "Employee" or (f[1] == "=" and isinstance(f[2], str)))
                     for f in filters
                 )
             )
-            allowed = allowed and not (
-                set(form) - {"fields", "filters", "limit_page_length", "limit_start"}
+            order = str(form.get("order_by") or "name asc").split()
+            allowed = (
+                allowed
+                and len(order) == 2
+                and order[0] in columns
+                and order[1].lower() in {"asc", "desc"}
             )
-        allowed = allowed or (method == "POST" and dt == "Leave Application" and len(parts) == 4)
-        if method == "GET":
+            if dt == "Employee":
+                allowed = (
+                    allowed
+                    and len(parts) == 4
+                    and bool(form.get("fields"))
+                    and not form.get("order_by")
+                )
             allowed = allowed and not (
                 set(form) - {"fields", "filters", "limit_page_length", "limit_start", "order_by"}
             )
