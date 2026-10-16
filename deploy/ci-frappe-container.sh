@@ -4,7 +4,7 @@ cd /home/frappe/frappe-bench
 ./env/bin/python -c 'import sys; assert sys.version_info >= (3, 12)'
 cp -r /workspace/frappe_apps/enterprise_base apps/enterprise_base
 ./env/bin/pip install -e apps/enterprise_base
-echo enterprise_base >> sites/apps.txt
+ls -1 apps > sites/apps.txt
 bench set-config -g db_host eb-db
 bench set-config -g redis_cache redis://eb-redis:6379
 bench set-config -g redis_queue redis://eb-redis:6379

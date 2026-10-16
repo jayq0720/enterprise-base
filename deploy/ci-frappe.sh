@@ -18,6 +18,9 @@ for attempt in {1..60}; do
   sleep 2
 done
 test "$ready" = true
+if test -f deploy/data/ci-frappe.tar; then
+  docker load -i deploy/data/ci-frappe.tar
+else
 source_dir=$(mktemp -d)
 git -C "$source_dir" init
 git -C "$source_dir" remote add origin https://github.com/frappe/frappe_docker
@@ -28,6 +31,9 @@ docker build -f "$source_dir/images/custom/Containerfile" --secret id=apps_json,
   --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 \
   --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 \
   -t eb-frappe-contract:0.1.0 "$source_dir"
+mkdir -p deploy/data
+docker save eb-frappe-contract:0.1.0 -o deploy/data/ci-frappe.tar
+fi
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
   -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh

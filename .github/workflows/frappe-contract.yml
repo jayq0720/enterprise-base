@@ -21,8 +21,19 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
           uv run mypy enterprise_base
+      - uses: actions/cache/restore@v4
+        id: base
+        with:
+          path: deploy/data/ci-frappe.tar
+          key: frappe-3556154-py3.12.12-v15.123.1-${{ hashFiles('deploy/apps.lock.json') }}
       - name: 真实站点测试、导出和空库导入
+        id: contract
         run: bash deploy/ci-frappe.sh
+      - uses: actions/cache/save@v4
+        if: always() && steps.base.outputs.cache-hit != 'true'
+        with:
+          path: deploy/data/ci-frappe.tar
+          key: frappe-3556154-py3.12.12-v15.123.1-${{ hashFiles('deploy/apps.lock.json') }}
       - uses: actions/upload-artifact@v4
         with:
           name: frappe-fixtures
