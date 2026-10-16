@@ -7,6 +7,7 @@ import httpx
 
 from kb_gateway.config import Settings
 from kb_gateway.models import EmployeeProfile, KnowledgeSpace
+from kb_gateway.scope import viewer_tokens
 
 
 class Directory(Protocol):
@@ -43,27 +44,24 @@ class FrappeDirectory:
             # 查不到或一个 userid 对应多个员工：都按无权处理
             return None
         row = rows[0]
+        department = row.get("department") or None
         designation = row.get("designation") or None
-        spaces = await self._spaces(designation) if designation else []
+        tokens = set(viewer_tokens(department, designation))
+        spaces = [sp for sp in await self._spaces() if tokens.intersection(sp.scope)]
         return EmployeeProfile(
-            employee=row["name"],
-            department=row.get("department") or None,
-            designation=designation,
-            spaces=spaces,
+            employee=row["name"], department=department, designation=designation, spaces=spaces
         )
 
-    async def _spaces(self, designation: str) -> list[KnowledgeSpace]:
+    async def _spaces(self) -> list[KnowledgeSpace]:
         resp = await self._client.get(
-            f"{self._base}/api/method/{self._s.frappe_spaces_method}",
-            headers=self._headers,
-            params={"designation": designation},
+            f"{self._base}/api/method/{self._s.frappe_spaces_method}", headers=self._headers
         )
         resp.raise_for_status()
         items = resp.json().get("message", [])
         return [
-            KnowledgeSpace(name=i["space"], dataset_id=i["dify_dataset_id"])
+            KnowledgeSpace(name=i["space"], dataset_id=i["dify_dataset_id"], scope=i["scope"])
             for i in items
-            if i.get("dify_dataset_id")
+            if i.get("dify_dataset_id") and isinstance(i.get("scope"), list)
         ]
 
 

@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     frappe_api_secret: SecretStr
     # Employee 上存企业微信 userid 的自定义字段（由 X2 同步写入）
     frappe_wecom_field: str = "wecom_userid"
-    # X1 提供的白名单方法：按岗位返回可见知识空间
-    frappe_spaces_method: str = "enterprise_base.duties.api.knowledge_spaces_for_designation"
+    # X1 提供的白名单方法：返回所有知识空间和可见范围，本服务按提问人筛选（和 X5 用同一个）
+    frappe_spaces_method: str = "enterprise_base.duties.api.knowledge_spaces"
 
     # Dify 知识库 API
     dify_api_base: HttpUrl

@@ -15,8 +15,12 @@ async def test_frappe_directory_requests_only_safe_fields(settings: Settings) ->
         if req.url.path == "/api/resource/Employee":
             row = {"name": "E1", "department": "人事部", "designation": "HRBP"}
             return httpx.Response(200, json={"data": [row]})
-        assert req.url.params["designation"] == "HRBP"
-        spaces = [{"space": "人事手册", "dify_dataset_id": "ds-hr"}, {"space": "未绑定"}]
+        assert req.url.path == "/api/method/enterprise_base.duties.api.knowledge_spaces"
+        spaces = [
+            {"space": "人事手册", "dify_dataset_id": "ds-hr", "scope": ["dept:人事部"]},
+            {"space": "财务手册", "dify_dataset_id": "ds-fin", "scope": ["desig:会计"]},
+            {"space": "未绑定", "scope": ["all"]},
+        ]
         return httpx.Response(200, json={"message": spaces})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:

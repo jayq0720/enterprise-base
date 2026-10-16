@@ -15,13 +15,18 @@ from kb_gateway.models import EmployeeProfile
 ALL = "all"
 
 
-def viewer_tokens(profile: EmployeeProfile) -> list[str]:
-    tokens = [ALL]
-    if profile.department:
-        tokens.append(f"dept:{profile.department}")
-    if profile.designation:
-        tokens.append(f"desig:{profile.designation}")
+def viewer_tokens(department: str | None, designation: str | None) -> list[str]:
+    """提问人的范围标记。查不到岗位时只看全员可见内容（任务清单 P1-C1）。"""
+    if not designation:
+        return [ALL]
+    tokens = [ALL, f"desig:{designation}"]
+    if department:
+        tokens.append(f"dept:{department}")
     return tokens
+
+
+def profile_tokens(profile: EmployeeProfile) -> list[str]:
+    return viewer_tokens(profile.department, profile.designation)
 
 
 def metadata_conditions(field: str, tokens: list[str]) -> dict[str, object]:
