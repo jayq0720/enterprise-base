@@ -70,6 +70,7 @@ class TestPermissions(FrappeTestCase):
         def headers(label):
             return {
                 "Host": site,
+                "Accept": "application/json",
                 "Authorization": f"token synthetic-p2-{label}:synthetic-p2-secret",
             }
 
@@ -119,6 +120,7 @@ class TestPermissions(FrappeTestCase):
                 self.assertNotIn(value.encode(), response.data)
             request("hr", "PUT", wiki_path, json={"content": "Edited synthetic draft"})
             request("hr", "PUT", wiki_path, 403, json={"is_published": 1})
+            request("hr", "PUT", wiki_path, 403, json={"is_group": 1, "is_published": 1})
             restore()
             page.reload()
             frappe.set_user("p2-hr@test.invalid")

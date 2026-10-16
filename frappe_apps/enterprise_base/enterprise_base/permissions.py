@@ -92,13 +92,14 @@ def redact_version(doc, method=None):
 
 
 def wiki_review(doc, method=None):
-    if doc.is_group:
+    manager = frappe.session.user == "Administrator" or "HR Manager" in frappe.get_roles()
+    if doc.is_group and manager:
         return
     old = doc.get_doc_before_save()
-    manager = frappe.session.user == "Administrator" or "HR Manager" in frappe.get_roles()
-    if not manager and (doc.is_published or (old and old.get("eb_review_state") != "EB Draft")):
+    published = frappe.utils.cint(doc.is_published)
+    if not manager and (published or (old and old.get("eb_review_state") != "EB Draft")):
         frappe.throw("制度必须由 HR Manager 审核发布。", frappe.PermissionError)
-    if bool(doc.is_published) != (doc.get("eb_review_state") == "EB Published"):
+    if bool(published) != (doc.get("eb_review_state") == "EB Published"):
         frappe.throw("请使用制度审核流程发布或撤回，不能直接修改发布标记。", frappe.PermissionError)
 
 

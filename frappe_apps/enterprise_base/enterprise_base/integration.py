@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from shutil import copyfile
 
 import frappe
 
@@ -42,6 +43,7 @@ def configure_webhooks() -> None:
 
 
 def export_configuration() -> None:
+    from frappe.modules.utils import export_customizations
     from frappe.utils.fixtures import export_fixtures
 
     export_fixtures("enterprise_base")
@@ -74,10 +76,6 @@ def export_configuration() -> None:
             target.parent.mkdir(exist_ok=True)
             path.unlink()
         target.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
-    from shutil import copyfile
-
-    from frappe.modules.utils import export_customizations
-
     for dt in (
         "Employee",
         "Designation",
