@@ -50,6 +50,7 @@ def test_mcp_lists_and_calls_tools(settings: Settings) -> None:
             "draft_leave",
             "leave_balance",
             "my_leave_applications",
+            "my_responsibilities",
             "pending_my_approval",
         ]
         token = session.issue(SECRET.encode(), "zhangsan", 900)

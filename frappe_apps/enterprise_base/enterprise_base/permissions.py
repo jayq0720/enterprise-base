@@ -8,6 +8,11 @@ from frappe.sessions import clear_sessions
 from hrms.overrides.employee_master import EmployeeMaster
 
 PRIVILEGED = {"HR User", "HR Manager", "EB Integration", "EB X4"}
+# X4 只能按“=”精确查这几张表的这几个字段（只查列表，不取整条记录）
+X4_COLUMNS = {
+    "Employee": {"name", "employee_name", "user_id", "wecom_userid", "designation"},
+    "Designation": {"name", "eb_responsibilities"},
+}
 X4_METHODS = {
     "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
     "hrms.hr.doctype.leave_application.leave_application.get_leave_approver",
@@ -142,17 +147,13 @@ def x4_api():
     if parts[:3] == ["", "api", "resource"] and len(parts) in (4, 5):
         dt = parts[3]
         allowed = method == "POST" and dt == "Leave Application" and len(parts) == 4
-        if method == "GET" and dt in {"Employee", "Leave Type", "Leave Application"}:
+        if method == "GET" and dt in {"Employee", "Designation", "Leave Type", "Leave Application"}:
             try:
                 fields = json.loads(form.get("fields") or '["name"]')
                 filters = json.loads(form.get("filters") or "[]")
             except (TypeError, ValueError):
                 fields, filters = [], []
-            columns = (
-                {"name", "employee_name", "user_id", "wecom_userid"}
-                if dt == "Employee"
-                else set(frappe.get_meta(dt).get_valid_columns())
-            )
+            columns = X4_COLUMNS.get(dt) or set(frappe.get_meta(dt).get_valid_columns())
             allowed = (
                 isinstance(fields, list)
                 and bool(fields)
@@ -166,7 +167,7 @@ def x4_api():
                     and len(f) == 3
                     and isinstance(f[0], str)
                     and f[0] in (columns | {"status"})
-                    and (dt != "Employee" or (f[1] == "=" and isinstance(f[2], str)))
+                    and (dt not in X4_COLUMNS or (f[1] == "=" and isinstance(f[2], str)))
                     for f in filters
                 )
             )
@@ -177,7 +178,7 @@ def x4_api():
                 and order[0] in columns
                 and order[1].lower() in {"asc", "desc"}
             )
-            if dt == "Employee":
+            if dt in X4_COLUMNS:
                 allowed = (
                     allowed
                     and len(parts) == 4

@@ -73,6 +73,10 @@ def build_mcp(tools: Tools, allowed_hosts: list[str]) -> FastMCP:
     async def pending_my_approval(session_token: str) -> dict[str, Any]:
         return await tools.pending_my_approval(session_token)
 
+    @mcp.tool(description=f"查询提问人自己的岗位和岗位职责。{SESSION_HINT}")
+    async def my_responsibilities(session_token: str) -> dict[str, Any]:
+        return await tools.my_responsibilities(session_token)
+
     @mcp.tool(
         description="帮提问人起草请假申请（只起草，不会提交）。leave_type 用假期类型名称，"
         "日期写成 YYYY-MM-DD，reason 是请假事由。返回草稿后把内容念给员工核对，"

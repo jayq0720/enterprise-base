@@ -2,7 +2,7 @@
 # 模型插件和 MCP 服务不在这里写死：导入前先装好通义千问插件并录入 Key，
 # 在“工具 → MCP”里添加 X4（服务标识填 eb-hr），导入后在“环境变量”里填地址和 Token。
 app:
-  description: 企业微信里的 HR 助手：问制度（按岗位检索，附出处）、查假期和请假进度、查待我审批、发起请假（员工确认后才提交）。
+  description: 企业微信里的 HR 助手：问制度（按岗位检索，附出处）、查假期和请假进度、查待我审批、查岗位职责、发起请假（员工确认后才提交）。
   icon: 🧑‍💼
   icon_background: '#E0F2FE'
   icon_type: emoji
@@ -57,7 +57,7 @@ workflow:
     value_type: secret
   features:
     file_upload: {}
-    opening_statement: 你好，我是 HR 助手。可以问我公司制度、查假期余额和请假进度，也可以帮你发起请假。
+    opening_statement: 你好，我是 HR 助手。可以问我公司制度、查假期余额和请假进度、查岗位职责，也可以帮你发起请假。
     retriever_resource:
       enabled: false
     sensitive_word_avoidance:
@@ -331,6 +331,8 @@ workflow:
           name: 查自己的请假申请、请假批了没有
         - id: approve
           name: 查等自己审批的请假、有什么要我审批
+        - id: duties
+          name: 查自己的岗位职责、我负责哪些工作
         - id: apply
           name: 要请假、帮我请假、发起请假申请
         - id: other
@@ -754,11 +756,76 @@ workflow:
         title: 回复
         answer: '{{#f_approve.text#}}'
         variables: []
-    - id: extract
+    - id: t_duties
       type: custom
       position:
         x: 1500
         y: 1500
+      data:
+        type: tool
+        title: 查岗位职责
+        provider_id: eb-hr
+        provider_name: eb-hr
+        provider_type: mcp
+        tool_name: my_responsibilities
+        tool_label: my_responsibilities
+        tool_configurations: {}
+        tool_parameters:
+          session_token:
+            type: mixed
+            value: '{{#token.token#}}'
+        error_strategy: default-value
+        default_value:
+        - key: text
+          type: string
+          value: ''
+        - key: json
+          type: array[object]
+          value: []
+    - id: f_duties
+      type: custom
+      position:
+        x: 1800
+        y: 1500
+      data:
+        type: code
+        title: 整理结果
+        code_language: python3
+        code: |
+          def main(out: list) -> dict:
+              """把 X4 的结果整理成给员工看的文字。"""
+              data = out[0] if out else {}
+              if not data:
+                  return {"text": "HR 系统暂时不可用，请稍后再试。"}
+              if data.get("error"):
+                  return {"text": data["error"]}
+              more = "\n（内容较长，只显示了前面一部分，完整内容请到 HR 系统查看。）" if data.get("truncated") else ""
+              duties = data.get("responsibilities", "")
+              return {"text": f"你的岗位是{data.get('designation', '')}，岗位职责：\n{duties}{more}"}
+        variables:
+        - variable: out
+          value_selector:
+          - t_duties
+          - json
+        outputs:
+          text:
+            type: string
+            children: null
+    - id: a_duties
+      type: custom
+      position:
+        x: 2100
+        y: 1500
+      data:
+        type: answer
+        title: 回复
+        answer: '{{#f_duties.text#}}'
+        variables: []
+    - id: extract
+      type: custom
+      position:
+        x: 1500
+        y: 1700
       data:
         type: parameter-extractor
         title: 提取请假信息
@@ -799,7 +866,7 @@ workflow:
       type: custom
       position:
         x: 1800
-        y: 1500
+        y: 1700
       data:
         type: tool
         title: 起草请假
@@ -837,7 +904,7 @@ workflow:
       type: custom
       position:
         x: 2100
-        y: 1500
+        y: 1700
       data:
         type: code
         title: 整理草稿
@@ -877,7 +944,7 @@ workflow:
       type: custom
       position:
         x: 2400
-        y: 1500
+        y: 1700
       data:
         type: assigner
         title: 保存草稿
@@ -895,7 +962,7 @@ workflow:
       type: custom
       position:
         x: 2700
-        y: 1500
+        y: 1700
       data:
         type: answer
         title: 回复草稿
@@ -905,7 +972,7 @@ workflow:
       type: custom
       position:
         x: 1500
-        y: 1700
+        y: 1900
       data:
         type: answer
         title: 说明能做什么
@@ -913,6 +980,7 @@ workflow:
           我可以帮你：
           · 回答公司制度问题
           · 查假期余额、自己的请假进度、等你审批的请假
+          · 查自己的岗位职责
           · 发起请假（会先给你核对，回复“确认请假”才提交）
         variables: []
     edges:
@@ -1058,6 +1126,33 @@ workflow:
       source: f_approve
       sourceHandle: source
       target: a_approve
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: tool
+      id: intent-duties-t_duties
+      source: intent
+      sourceHandle: duties
+      target: t_duties
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: tool
+        targetType: code
+      id: t_duties-source-f_duties
+      source: t_duties
+      sourceHandle: source
+      target: f_duties
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: f_duties-source-a_duties
+      source: f_duties
+      sourceHandle: source
+      target: a_duties
       targetHandle: target
       type: custom
     - data:

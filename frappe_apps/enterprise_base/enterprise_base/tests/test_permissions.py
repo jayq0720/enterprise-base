@@ -263,3 +263,86 @@ class TestReviewFixes(FrappeTestCase):
             )
         )
         self.assertTrue(frappe.db.exists("User Permission", manual.name))
+
+
+class TestX4Duties(FrappeTestCase):
+    def test_x4_reads_designation_duties_only(self):
+        site = frappe.local.site
+        frappe.set_user("Administrator")
+        data = json.loads(Path(__file__).with_name("p2_data.json").read_text())
+        for row in data["records"]:
+            if row["doctype"] != "Version" and not frappe.db.exists(
+                row["doctype"], row.get("name")
+            ):
+                frappe.get_doc(row).insert()
+        suffix = frappe.generate_hash(length=8)
+        designation = frappe.get_doc(
+            {
+                "doctype": "Designation",
+                "designation_name": "P2 Duty " + suffix,
+                "eb_responsibilities": "<p>Synthetic duty</p>",
+            }
+        ).insert()
+        frappe.get_doc(
+            {
+                **data["employee"],
+                "first_name": "duty",
+                "employee_number": "P2-duty-" + suffix,
+                "user_id": None,
+                "leave_approver": None,
+                "create_user_permission": 0,
+                "wecom_userid": "p2-duty-" + suffix,
+                "designation": designation.name,
+            }
+        ).insert()
+        x4 = frappe.get_doc("User", "eb-x4@integration.invalid")
+        x4.enabled, x4.api_key, x4.api_secret = 1, "synthetic-duty-x4", "synthetic-duty-secret"
+        x4.save()
+        frappe.db.commit()
+        client = Client(application, Response, use_cookies=False)
+        auth = {"Host": site, "Authorization": "token synthetic-duty-x4:synthetic-duty-secret"}
+
+        def get(path, expected=200, **query):
+            response = client.get(path, headers=auth, query_string=query)
+            self.assertEqual(response.status_code, expected, f"{path} {query}")
+            return (response.get_json() or {}).get("data")
+
+        own = [["name", "=", designation.name]]
+        try:
+            rows = get(
+                EMPLOYEE_API,
+                fields='["name","employee_name","user_id","designation"]',
+                filters=json.dumps([["wecom_userid", "=", "p2-duty-" + suffix]]),
+            )
+            self.assertEqual(rows[0]["designation"], designation.name)
+            rows = get(
+                "/api/resource/Designation",
+                fields='["name","eb_responsibilities"]',
+                filters=json.dumps(own),
+            )
+            self.assertEqual(
+                rows, [{"name": designation.name, "eb_responsibilities": "<p>Synthetic duty</p>"}]
+            )
+            # 岗位只能按名称精确查名称和职责两个字段，不能取整条记录、其它字段或模糊查
+            get("/api/resource/Designation", 403, fields='["appraisal_template"]')
+            get("/api/resource/Designation", 403, filters=json.dumps(own))
+            get(
+                "/api/resource/Designation",
+                403,
+                fields='["name"]',
+                filters=json.dumps([["name", "like", "%"]]),
+            )
+            get("/api/resource/Designation", 403, fields='["name"]', order_by="name asc")
+            get("/api/resource/Designation/" + designation.name, 403)
+            response = client.put(
+                "/api/resource/Designation/" + designation.name,
+                headers=auth,
+                json={"eb_responsibilities": "changed"},
+            )
+            self.assertEqual(response.status_code, 403)
+        finally:
+            frappe.set_user("Administrator")
+            x4 = frappe.get_doc("User", "eb-x4@integration.invalid")
+            x4.enabled, x4.api_key, x4.api_secret = 0, None, None
+            x4.save()
+            frappe.db.commit()
