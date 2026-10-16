@@ -57,7 +57,8 @@ def read_rows(content):
                     ):
                         error(sheet, number, label, "不允许公式或超过 10000 字的单元格。")
                 required = (
-                    (0,) if sheet == "部门" else ((0, 1) if sheet == "岗位" else (0, 1, 2, 3, 4, 6))
+                    # 企业微信 userid、入职日期选填，留空不改原值（见 template.schema.json）
+                    (0,) if sheet == "部门" else ((0, 1) if sheet == "岗位" else (0, 1, 3, 4))
                 )
                 for col in required:
                     if not values[col]:
@@ -74,10 +75,14 @@ def read_rows(content):
                     try:
                         value = cells[6].value
                         values[6] = (
-                            value.date()
-                            if isinstance(value, dt.datetime)
-                            else dt.date.fromisoformat(str(value))
-                        ).isoformat()
+                            ""
+                            if value in (None, "")
+                            else (
+                                value.date()
+                                if isinstance(value, dt.datetime)
+                                else dt.date.fromisoformat(str(value))
+                            ).isoformat()
+                        )
                     except (TypeError, ValueError):
                         error(sheet, number, columns[6], "必须为有效日期 yyyy-mm-dd。")
                 rows[sheet].append((number, values))
@@ -154,12 +159,13 @@ def prepare(company, rows, errors):
         selected[row[0]] = employee.name
         if employee.employee_name != row[1]:
             error("员工任职", number, 1, "姓名与工号对应档案不符。")
-        if row[2] in uids or frappe.db.exists(
-            "Employee", {"wecom_userid": row[2], "name": ["!=", employee.name]}
+        if row[2] and (
+            row[2] in uids
+            or frappe.db.exists("Employee", {"wecom_userid": row[2], "name": ["!=", employee.name]})
         ):
             error("员工任职", number, 2, "企业微信 userid 已由其他员工使用。")
         uids.add(row[2])
-        if not managers and (employee.wecom_userid or "") != row[2]:
+        if row[2] and not managers and (employee.wecom_userid or "") != row[2]:
             error("员工任职", number, 2, "身份关联只能由 HR Manager 修改。")
         if row[3] not in aliases:
             error("员工任职", number, 3, "部门不存在或不属于所选公司。")
@@ -258,13 +264,16 @@ def import_workbook(file_url, company, save=False):
                 doc = frappe.get_doc("Employee", numbers[row[0]][0].name)
                 doc.update(
                     {
-                        "wecom_userid": row[2],
                         "department": aliases[row[3]],
                         "designation": row[4],
                         "reports_to": numbers[row[5]][0].name if row[5] else None,
-                        "date_of_joining": row[6],
                     }
                 )
+                # 选填列留空不改原值
+                if row[2]:
+                    doc.wecom_userid = row[2]
+                if row[6]:
+                    doc.date_of_joining = row[6]
                 persist(doc)
         except Exception:
             frappe.db.rollback(save_point="eb_org_import")

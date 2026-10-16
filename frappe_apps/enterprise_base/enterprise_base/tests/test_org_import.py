@@ -84,6 +84,15 @@ class TestOrgImport(FrappeTestCase):
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         self.assertFalse(frappe.db.exists("Department", {"department_name": self.rows[0][1][0]}))
 
+    def test_optional_columns_keep_existing_values(self):
+        joined = frappe.db.get_value("Employee", self.emp.name, "date_of_joining")
+        self.rows[2][0][2] = self.rows[2][0][6] = ""
+        self.assertTrue(self.run_import()["saved"])
+        self.emp.reload()
+        self.assertEqual(self.emp.wecom_userid, self.suffix)
+        self.assertEqual(self.emp.date_of_joining, joined)
+        self.assertEqual(self.emp.designation, self.rows[1][0][0])
+
     def test_other_employee_userid_is_rejected(self):
         other = frappe.copy_doc(self.emp)
         other.employee_number, other.wecom_userid = self.suffix + "b", self.suffix + "b"
