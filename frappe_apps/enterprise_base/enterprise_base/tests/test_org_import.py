@@ -1,5 +1,3 @@
-"""真实 Frappe 站点：全量拒绝、事务回滚、幂等及字段边界。"""
-
 import io
 import json
 from pathlib import Path
@@ -20,13 +18,12 @@ class TestOrgImport(FrappeTestCase):
             if row["doctype"] != "Version" and not frappe.db.exists(row["doctype"], row["name"]):
                 frappe.get_doc(row).insert()
         self.suffix = frappe.generate_hash(length=8)
-        employee = data["employee"]
-        employee.update(first_name="Import", user_id=None, leave_approver=None)
-        employee.update(employee_number=self.suffix, wecom_userid=self.suffix)
-        self.emp = frappe.get_doc(employee).insert()
-        self.rows = json.loads(
+        case = json.loads(
             Path(__file__).with_name("org_import_data.json").read_text().replace("$id", self.suffix)
         )
+        data["employee"].update(case["employee"])
+        self.emp = frappe.get_doc(data["employee"]).insert()
+        self.rows, self.user = case["rows"], case["user"]
 
     def content(self, extra=None):
         book, output = Workbook(), io.BytesIO()
@@ -49,10 +46,13 @@ class TestOrgImport(FrappeTestCase):
         return import_workbook(file.file_url, self.emp.company, save)
 
     def test_save_and_repeat(self):
+        frappe.get_doc(self.user).insert()
+        frappe.set_user(self.user["email"])
         self.assertFalse(self.run_import(False)["errors"])
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         for _ in range(2):
-            self.assertTrue(self.run_import()["saved"])
+            result = self.run_import()
+            self.assertTrue(result.get("saved"), result)
         self.emp.reload()
         self.assertEqual(self.emp.designation, self.rows[1][0][0])
         self.assertEqual(frappe.db.count("Designation", {"name": self.emp.designation}), 1)
