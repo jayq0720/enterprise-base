@@ -11,6 +11,8 @@ from enterprise_base.duties.access import READABLE
 
 
 def ensure_role() -> None:
+    if not frappe.db.exists("Role", "EB X4"):
+        frappe.get_doc({"doctype": "Role", "role_name": "EB X4", "desk_access": 0}).insert()
     if not frappe.db.exists("Role", "EB Integration"):
         frappe.get_doc(
             {"doctype": "Role", "role_name": "EB Integration", "desk_access": 0}
@@ -77,5 +79,5 @@ def configure() -> None:
         if not frappe.db.exists("User", user["email"]):
             doc = frappe.get_doc(user).insert()
             # Wiki 的 after_insert 会自动加 Wiki User；技术身份不继承该额外角色。
-            doc.set("roles", [{"role": "EB Integration"}])
+            doc.set("roles", user["roles"])
             doc.save()

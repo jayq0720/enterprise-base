@@ -20,6 +20,12 @@ def configure_webhooks() -> None:
                 "name": name,
                 "webhook_doctype": "Wiki Document",
                 "webhook_docevent": event,
+                "condition": (
+                    "not doc.is_group and (doc.is_published or "
+                    "(doc.get_doc_before_save() and doc.get_doc_before_save().is_published))"
+                )
+                if event == "on_update"
+                else "not doc.is_group and doc.is_published",
                 "request_url": "http://policy-sync:8080/v1/hooks/wiki",
                 "request_method": "POST",
                 "request_structure": "JSON",
@@ -68,3 +74,17 @@ def export_configuration() -> None:
             target.parent.mkdir(exist_ok=True)
             path.unlink()
         target.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+    from shutil import copyfile
+
+    from frappe.modules.utils import export_customizations
+
+    for dt in (
+        "Employee",
+        "Designation",
+        "EB Knowledge Space",
+        "Wiki Document",
+        "Leave Type",
+        "Leave Application",
+    ):
+        path = export_customizations("Duties", dt, sync_on_migrate=True, with_permissions=True)
+        copyfile(path, folder.parent / "setup_fixtures" / ("p2_" + Path(path).name))

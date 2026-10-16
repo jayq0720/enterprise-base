@@ -32,5 +32,19 @@
     "user_type": "Website User",
     "enabled": 0,
     "send_welcome_email": 0
+  },
+  {
+    "doctype": "User",
+    "email": "eb-x4@integration.invalid",
+    "name": "eb-x4@integration.invalid",
+    "first_name": "X4",
+    "enabled": 0,
+    "send_welcome_email": 0,
+    "user_type": "Website User",
+    "roles": [
+      {
+        "role": "EB X4"
+      }
+    ]
   }
 ]

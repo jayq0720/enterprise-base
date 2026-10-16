@@ -1,0 +1,13 @@
+{
+  "users": {"hr": ["HR User", "Employee"], "manager": ["HR Manager", "Employee"], "staff": ["Employee"]},
+  "records": [
+    {"doctype": "Warehouse Type", "name": "Transit"},
+    {"doctype": "Company", "name": "P2 Synthetic", "company_name": "P2 Synthetic", "abbr": "P2T", "country": "China", "default_currency": "CNY"},
+    {"doctype": "Holiday List", "name": "P2 Test Holidays", "holiday_list_name": "P2 Test Holidays", "from_date": "2026-01-01", "to_date": "2027-12-31"},
+    {"doctype": "Leave Type", "name": "P2 Synthetic LWP", "leave_type_name": "P2 Synthetic LWP", "is_lwp": 1, "include_holiday": 1}
+  ],
+  "employee": {"doctype": "Employee", "gender": "Other", "date_of_birth": "2000-01-01", "date_of_joining": "2020-01-01", "company": "P2 Synthetic", "status": "Active", "create_user_permission": 0, "holiday_list": "P2 Test Holidays", "leave_approver": "p2-manager@test.invalid", "wecom_userid": "p2-staff", "cell_number": "19900000000", "bank_ac_no": "SYNTHETIC-ACCOUNT", "eb_national_id": "SYNTHETIC-ID", "ctc": 424242},
+  "sensitive": ["cell_number", "bank_ac_no", "eb_national_id", "ctc"],
+  "wiki_space": {"doctype": "Wiki Space", "space_name": "P2 Synthetic Policies", "route": "p2-test-policies", "roles": [{"role": "HR User", "permission_level": "Write"}, {"role": "HR Manager", "permission_level": "Write"}]},
+  "leave": {"leave_type": "P2 Synthetic LWP", "from_date": "2026-10-19", "to_date": "2026-10-19", "posting_date": "2026-10-16", "status": "Open", "leave_approver": "p2-manager@test.invalid", "description": "Synthetic test", "follow_via_email": 0}
+}
