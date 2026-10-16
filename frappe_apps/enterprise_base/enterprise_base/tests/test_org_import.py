@@ -42,13 +42,9 @@ class TestOrgImport(FrappeTestCase):
         return output.getvalue()
 
     def run_import(self, save=True):
+        filename = self.suffix + ".xlsx"
         file = frappe.get_doc(
-            {
-                "doctype": "File",
-                "file_name": self.suffix + ".xlsx",
-                "is_private": 1,
-                "content": self.content(),
-            }
+            dict(doctype="File", file_name=filename, is_private=1, content=self.content())
         ).insert()
         return import_workbook(file.file_url, self.emp.company, save)
 
@@ -79,11 +75,12 @@ class TestOrgImport(FrappeTestCase):
     def test_save_failure_rolls_back_and_redacts(self):
         with patch(
             "enterprise_base.permissions.Employee.save",
-            side_effect=frappe.ValidationError("PRIVATE_MARKER"),
+            side_effect=lambda *a, **kw: frappe.throw("PRIVATE_MARKER"),
         ):
             result = self.run_import()
         self.assertTrue(result["errors"])
         self.assertNotIn("PRIVATE_MARKER", json.dumps(result))
+        self.assertNotIn("PRIVATE_MARKER", json.dumps(frappe.local.message_log))
         self.assertFalse(frappe.db.exists("Designation", self.rows[1][0][0]))
         self.assertFalse(frappe.db.exists("Department", {"department_name": self.rows[0][1][0]}))
 

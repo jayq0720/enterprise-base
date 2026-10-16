@@ -207,6 +207,7 @@ def import_workbook(file_url, company, save=False):
         if errors or not frappe.utils.cint(save):
             return {"errors": errors, "counts": {k: len(v) for k, v in rows.items()}}
         frappe.db.savepoint("eb_org_import")
+        messages = list(frappe.local.message_log or [])
         try:
             location = ("部门", 0)
             pending = list(rows["部门"])
@@ -277,4 +278,6 @@ def import_workbook(file_url, company, save=False):
                     )
                 ]
             }
+        finally:
+            frappe.local.message_log = messages
     return {"errors": [], "saved": True, "counts": {k: len(v) for k, v in rows.items()}}
