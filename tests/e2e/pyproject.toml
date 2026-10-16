@@ -1,0 +1,34 @@
+[project]
+name = "eb-e2e"
+version = "0.1.0"
+description = "端到端测试：对一套已部署的测试环境，用合成数据走通 X1–X5 和 HR 助手"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pytest>=8",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.6", "mypy>=1.11"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "S101"]
+
+[tool.mypy]
+strict = true
+files = ["e2e", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
