@@ -62,11 +62,37 @@ def employee_query(user=None):
 
 
 def hr_scope(doc, method=None):
+    # 只删 HRMS 按员工档案自动生成的“只能看自己”那一条；管理员手工加的范围限制保留。
     if any(r.role in {"HR User", "HR Manager"} for r in doc.roles):
+        own = frappe.get_all("Employee", filters={"user_id": doc.name}, pluck="name")
+        if not own:
+            return
         for name in frappe.get_all(
-            "User Permission", filters={"user": doc.name, "allow": "Employee"}, pluck="name"
+            "User Permission",
+            filters={"user": doc.name, "allow": "Employee", "for_value": ["in", own]},
+            pluck="name",
         ):
             frappe.delete_doc("User Permission", name, ignore_permissions=True)
+
+
+def align_wiki_review_state() -> None:
+    """启用审核流程前已发布的页面补成“已发布”，其余空状态补成“草稿”。
+
+    不补的话旧页面发布标记和审核状态对不上，wiki_review 会拒绝所有修改，
+    只能先送审（会先撤下页面）。只改审核状态，不动发布标记，不触发 X5 推送；
+    状态一致的页面不受影响，可重复执行。
+    """
+    if not frappe.db.has_column("Wiki Document", "eb_review_state"):
+        return
+    frappe.db.sql(
+        """update `tabWiki Document` set eb_review_state = 'EB Published'
+        where is_group = 0 and is_published = 1
+        and ifnull(eb_review_state, '') != 'EB Published'"""
+    )
+    frappe.db.sql(
+        """update `tabWiki Document` set eb_review_state = 'EB Draft'
+        where is_group = 0 and is_published = 0 and ifnull(eb_review_state, '') = ''"""
+    )
 
 
 def disable_left_user(doc, method=None):

@@ -183,3 +183,83 @@ class TestPermissions(FrappeTestCase):
             x4.enabled, x4.api_key, x4.api_secret = 0, None, None
             x4.save()
             frappe.db.commit()
+
+
+class TestReviewFixes(FrappeTestCase):
+    def setUp(self):
+        frappe.set_user("Administrator")
+
+    def test_legacy_published_page_aligned(self):
+        from enterprise_base.permissions import align_wiki_review_state
+
+        wiki = frappe.get_doc(
+            {
+                "doctype": "Wiki Space",
+                "space_name": "P2 Legacy",
+                "route": "p2-legacy-" + frappe.generate_hash(length=8),
+            }
+        ).insert()
+        page = frappe.get_doc(
+            {
+                "doctype": "Wiki Document",
+                "title": "P2 Legacy Policy",
+                "parent_wiki_document": wiki.root_group,
+                "content": "Legacy",
+                "is_published": 0,
+            }
+        ).insert()
+        # 模拟启用审核流程前就已发布的页面：发布标记是 1，审核状态却是草稿
+        frappe.db.set_value(
+            "Wiki Document",
+            page.name,
+            {"is_published": 1, "eb_review_state": "EB Draft"},
+            update_modified=False,
+        )
+        align_wiki_review_state()
+        page.reload()
+        self.assertEqual((page.is_published, page.eb_review_state), (1, "EB Published"))
+        page.content = "Legacy edited by manager"
+        page.save()
+        align_wiki_review_state()
+        page.reload()
+        self.assertEqual(page.eb_review_state, "EB Published")
+
+    def test_hr_scope_keeps_manual_restriction(self):
+        data = json.loads(Path(__file__).with_name("p2_data.json").read_text())
+        for row in data["records"]:
+            if row["doctype"] != "Version" and not frappe.db.exists(
+                row["doctype"], row.get("name")
+            ):
+                frappe.get_doc(row).insert()
+        email = "p2-scope@test.invalid"
+        user = frappe.get_doc(
+            {**data["user"], "email": email, "roles": [{"role": "HR User"}]}
+        ).insert()
+        own, other = (
+            frappe.get_doc(
+                {
+                    **data["employee"],
+                    "first_name": label,
+                    "employee_number": "P2-scope-" + label,
+                    "user_id": email if label == "own" else None,
+                    "wecom_userid": "p2-scope-" + label,
+                }
+            ).insert()
+            for label in ("own", "other")
+        )
+        manual = frappe.get_doc(
+            {
+                "doctype": "User Permission",
+                "user": email,
+                "allow": "Employee",
+                "for_value": other.name,
+            }
+        ).insert(ignore_permissions=True)
+        user.reload()
+        user.save()
+        self.assertFalse(
+            frappe.db.exists(
+                "User Permission", {"user": email, "allow": "Employee", "for_value": own.name}
+            )
+        )
+        self.assertTrue(frappe.db.exists("User Permission", manual.name))
