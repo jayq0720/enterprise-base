@@ -1,0 +1,35 @@
+name: policy-image
+on:
+  pull_request:
+    paths: ['services/policy_sync/**', '.github/workflows/policy-image.yml']
+  push:
+    branches: [main]
+    paths: ['services/policy_sync/**', '.github/workflows/policy-image.yml']
+permissions:
+  contents: read
+  packages: write
+jobs:
+  image:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: 构建并发布固定提交镜像
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-policy-sync"
+          source=$(git rev-parse HEAD)
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            -t "$image:sha-$source" services/policy_sync
+          docker push "$image:sha-$source"
+          mkdir -p artifacts
+          docker image inspect "$image:sha-$source" --format '{{index .RepoDigests 0}}' > artifacts/policy-image.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: policy-image
+          path: artifacts/policy-image.txt
+          retention-days: 3
