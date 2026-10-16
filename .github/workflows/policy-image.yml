@@ -7,7 +7,7 @@ on:
     paths: ['services/policy_sync/**', '.github/workflows/policy-image.yml']
 permissions:
   contents: read
-  packages: write
+  packages: write  # 只有 push 到 main 的发布步骤会用到
 jobs:
   image:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
@@ -16,19 +16,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: 构建并发布固定提交镜像
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # PR 上只构建，确认 Dockerfile 能用；只有合入 main 的代码才推到 GHCR，部署只用 main 构建的摘要。
+      - name: 构建镜像
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}-policy-sync"
           source=$(git rev-parse HEAD)
-          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker build --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
             -t "$image:sha-$source" services/policy_sync
-          docker push "$image:sha-$source"
+          echo "image=$image:sha-$source" >> "$GITHUB_ENV"
+      - name: 发布固定提交镜像（仅 main）
+        if: github.event_name == 'push'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$image"
           mkdir -p artifacts
-          docker image inspect "$image:sha-$source" --format '{{index .RepoDigests 0}}' > artifacts/policy-image.txt
+          docker image inspect "$image" --format '{{index .RepoDigests 0}}' > artifacts/policy-image.txt
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
         with:
           name: policy-image
           path: artifacts/policy-image.txt
