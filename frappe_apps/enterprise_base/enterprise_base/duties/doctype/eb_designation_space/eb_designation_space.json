@@ -1,0 +1,22 @@
+{
+  "doctype": "DocType",
+  "name": "EB Designation Space",
+  "module": "Duties",
+  "custom": 0,
+  "istable": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "knowledge_space"
+  ],
+  "fields": [
+    {
+      "fieldname": "knowledge_space",
+      "fieldtype": "Link",
+      "label": "知识空间",
+      "options": "EB Knowledge Space",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "permissions": []
+}

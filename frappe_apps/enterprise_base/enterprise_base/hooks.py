@@ -1,0 +1,34 @@
+app_name = "enterprise_base"
+app_title = "Enterprise Base"
+app_publisher = "Enterprise Base contributors"
+app_description = "X1 岗位职责与知识空间"
+app_email = "maintainers@example.invalid"
+app_license = "GPL-3.0"
+required_apps = ["hrms", "wiki"]
+before_install = "enterprise_base.install.ensure_role"
+after_sync = "enterprise_base.install.configure"
+after_migrate = "enterprise_base.install.configure"
+doc_events = {
+    doctype: {
+        "validate": "enterprise_base.duties.validation.validate_scope_name",
+        "before_rename": "enterprise_base.duties.validation.validate_scope_rename",
+    }
+    for doctype in ("Department", "Designation")
+}
+fixtures = [
+    {"dt": "Role", "filters": [["name", "=", "EB Integration"]]},
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Designation-eb_responsibilities",
+                    "Designation-eb_knowledge_spaces",
+                    "Employee-wecom_userid",
+                ],
+            ]
+        ],
+    },
+]
