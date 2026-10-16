@@ -25,6 +25,15 @@ def configure() -> None:
     ensure_role()
     create_custom_fields(
         {
+            "Department": [
+                {
+                    "fieldname": "eb_wecom_department_id",
+                    "label": "企业微信部门 ID",
+                    "fieldtype": "Data",
+                    "unique": 1,
+                    "read_only": 1,
+                }
+            ],
             "Employee": [
                 {
                     "fieldname": "wecom_userid",
