@@ -1,0 +1,30 @@
+[
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.708787",
+    "name": "EB Send for Review",
+    "workflow_action_name": "EB Send for Review"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.709549",
+    "name": "EB Publish",
+    "workflow_action_name": "EB Publish"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.710309",
+    "name": "EB Return",
+    "workflow_action_name": "EB Return"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.711027",
+    "name": "EB Withdraw",
+    "workflow_action_name": "EB Withdraw"
+  }
+]

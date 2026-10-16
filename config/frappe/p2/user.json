@@ -1,0 +1,53 @@
+[
+  {
+    "doctype": "User",
+    "email": "eb-x3@integration.invalid",
+    "first_name": "X3",
+    "name": "eb-x3@integration.invalid",
+    "roles": [
+      {
+        "parent": "eb-x3@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "EB Integration"
+      }
+    ],
+    "user_type": "Website User",
+    "enabled": 0,
+    "send_welcome_email": 0
+  },
+  {
+    "doctype": "User",
+    "email": "eb-x5@integration.invalid",
+    "first_name": "X5",
+    "name": "eb-x5@integration.invalid",
+    "roles": [
+      {
+        "parent": "eb-x5@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "EB Integration"
+      }
+    ],
+    "user_type": "Website User",
+    "enabled": 0,
+    "send_welcome_email": 0
+  },
+  {
+    "doctype": "User",
+    "email": "eb-x4@integration.invalid",
+    "first_name": "X4",
+    "name": "eb-x4@integration.invalid",
+    "roles": [
+      {
+        "parent": "eb-x4@integration.invalid",
+        "parentfield": "roles",
+        "parenttype": "User",
+        "role": "EB X4"
+      }
+    ],
+    "user_type": "Website User",
+    "enabled": 0,
+    "send_welcome_email": 0
+  }
+]

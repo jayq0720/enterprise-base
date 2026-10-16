@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from shutil import copyfile
 
 import frappe
 
@@ -20,6 +21,12 @@ def configure_webhooks() -> None:
                 "name": name,
                 "webhook_doctype": "Wiki Document",
                 "webhook_docevent": event,
+                "condition": (
+                    "not doc.is_group and (doc.is_published or "
+                    "(doc.get_doc_before_save() and doc.get_doc_before_save().is_published))"
+                )
+                if event == "on_update"
+                else "not doc.is_group and doc.is_published",
                 "request_url": "http://policy-sync:8080/v1/hooks/wiki",
                 "request_method": "POST",
                 "request_structure": "JSON",
@@ -36,6 +43,7 @@ def configure_webhooks() -> None:
 
 
 def export_configuration() -> None:
+    from frappe.modules.utils import export_customizations
     from frappe.utils.fixtures import export_fixtures
 
     export_fixtures("enterprise_base")
@@ -68,3 +76,12 @@ def export_configuration() -> None:
             target.parent.mkdir(exist_ok=True)
             path.unlink()
         target.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+    previous = frappe.conf.get("developer_mode")
+    try:
+        frappe.conf.developer_mode = 1
+        for source in (folder.parent / "duties/custom").glob("*.json"):
+            dt = json.loads(source.read_text())["doctype"]
+            path = export_customizations("Duties", dt, sync_on_migrate=True, with_permissions=True)
+            copyfile(path, folder.parent / "setup_fixtures" / ("p2_" + Path(path).name))
+    finally:
+        frappe.conf.developer_mode = previous

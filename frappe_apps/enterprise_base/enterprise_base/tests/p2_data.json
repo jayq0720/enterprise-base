@@ -1,0 +1,185 @@
+{
+  "users": {
+    "hr": [
+      "HR User",
+      "Employee"
+    ],
+    "manager": [
+      "HR Manager",
+      "Employee"
+    ],
+    "staff": [
+      "Employee"
+    ]
+  },
+  "records": [
+    {
+      "doctype": "Gender",
+      "name": "Other",
+      "gender": "Other"
+    },
+    {
+      "doctype": "Warehouse Type",
+      "name": "Transit"
+    },
+    {
+      "doctype": "Designation",
+      "name": "P2 Synthetic Position",
+      "designation_name": "P2 Synthetic Position"
+    },
+    {
+      "doctype": "Company",
+      "name": "P2 Synthetic",
+      "company_name": "P2 Synthetic",
+      "abbr": "P2T",
+      "country": "China",
+      "default_currency": "CNY"
+    },
+    {
+      "doctype": "Holiday List",
+      "name": "P2 Test Holidays",
+      "holiday_list_name": "P2 Test Holidays",
+      "from_date": "2026-01-01",
+      "to_date": "2027-12-31"
+    },
+    {
+      "doctype": "Leave Type",
+      "name": "P2 Synthetic LWP",
+      "leave_type_name": "P2 Synthetic LWP",
+      "is_lwp": 1,
+      "include_holiday": 1
+    },
+    {
+      "doctype": "Version",
+      "name": "P2 Synthetic Audit",
+      "ref_doctype": "Employee",
+      "docname": "P2 Synthetic Employee",
+      "data": "{\"changed\": [[\"cell_number\", \"old\", \"19900000000\"], [\"ctc\", 0, 424242]]}"
+    }
+  ],
+  "employee": {
+    "doctype": "Employee",
+    "gender": "Other",
+    "date_of_birth": "2000-01-01",
+    "date_of_joining": "2020-01-01",
+    "company": "P2 Synthetic",
+    "status": "Active",
+    "create_user_permission": 1,
+    "holiday_list": "P2 Test Holidays",
+    "leave_approver": "p2-manager@test.invalid",
+    "wecom_userid": "p2-staff",
+    "cell_number": "19900000000",
+    "bank_ac_no": "SYNTHETIC-ACCOUNT",
+    "eb_national_id": "SYNTHETIC-ID",
+    "ctc": 424242
+  },
+  "sensitive": [
+    "cell_number",
+    "emergency_phone_number",
+    "passport_number",
+    "eb_national_id",
+    "bank_name",
+    "bank_ac_no",
+    "salary_mode",
+    "salary_currency",
+    "ctc",
+    "payroll_cost_center"
+  ],
+  "wiki_space": {
+    "doctype": "Wiki Space",
+    "space_name": "P2 Synthetic Policies",
+    "route": "p2-test-policies",
+    "roles": [
+      {
+        "role": "HR User",
+        "permission_level": "Write"
+      },
+      {
+        "role": "HR Manager",
+        "permission_level": "Write"
+      },
+      {
+        "role": "EB Integration",
+        "permission_level": "Read"
+      }
+    ]
+  },
+  "leave": {
+    "leave_type": "P2 Synthetic LWP",
+    "from_date": "2026-10-19",
+    "to_date": "2026-10-19",
+    "posting_date": "2026-10-16",
+    "status": "Open",
+    "leave_approver": "p2-manager@test.invalid",
+    "description": "Synthetic test",
+    "follow_via_email": 0
+  },
+  "user": {
+    "doctype": "User",
+    "first_name": "P2 Synthetic",
+    "send_welcome_email": 0
+  },
+  "restricted_query": {
+    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]"
+  },
+  "export_query": {
+    "doctype": "Employee",
+    "fields": "[\"name\", \"cell_number\", \"emergency_phone_number\", \"passport_number\", \"eb_national_id\", \"bank_name\", \"bank_ac_no\", \"salary_mode\", \"salary_currency\", \"ctc\", \"payroll_cost_center\"]",
+    "file_format_type": "CSV"
+  },
+  "private_samples": [
+    "19900000000",
+    "424242",
+    "SYNTHETIC-ID",
+    "SYNTHETIC-ACCOUNT"
+  ],
+  "x4_sensitive_query": {
+    "fields": "[\"cell_number\"]"
+  },
+  "x4_joins": [
+    {
+      "fields": "[\"employee.date_of_birth\"]"
+    },
+    {
+      "fields": "[\"name\"]",
+      "filters": "[[\"employee.date_of_birth\",\"=\",\"2000-01-01\"]]"
+    },
+    {
+      "fields": "[\"name\"]",
+      "order_by": "employee.date_of_birth desc"
+    }
+  ],
+  "x4_reads": {
+    "Leave Type": {
+      "fields": "[\"name\"]",
+      "order_by": "name asc"
+    },
+    "Leave Application": {
+      "fields": "[\"name\", \"employee_name\", \"leave_type\", \"from_date\", \"to_date\", \"total_leave_days\", \"status\", \"leave_approver_name\", \"posting_date\"]",
+      "order_by": "from_date desc"
+    }
+  },
+  "employee_reads": [
+    [
+      "hr",
+      "staff",
+      false
+    ],
+    [
+      "manager",
+      "staff",
+      true
+    ],
+    [
+      "staff",
+      "staff",
+      true
+    ],
+    [
+      "hr",
+      "hr",
+      true
+    ]
+  ],
+  "position_path": "/api/resource/Designation/P2 Synthetic Position"
+}
