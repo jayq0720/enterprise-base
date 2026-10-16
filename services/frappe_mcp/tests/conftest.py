@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from frappe_mcp.config import Settings
-from frappe_mcp.frappe import Employee
+from frappe_mcp.frappe import Employee, FrappeRejected
 
 TOKEN = "t" * 40
 SECRET = "s" * 40
@@ -30,6 +30,8 @@ class FakeHR:
         }
         self.calls: list[tuple[str, object]] = []
         self.down = False
+        self.reject: FrappeRejected | None = None
+        self.created: list[dict[str, Any]] = []
 
     async def employee(self, wecom_userid: str) -> Employee | None:
         if self.down:
@@ -66,3 +68,12 @@ class FakeHR:
                 "leave_approver_name": "李四",
             }
         ]
+
+    async def leave_types(self) -> list[str]:
+        return ["年假", "病假"]
+
+    async def create_leave(self, doc: dict[str, Any]) -> str:
+        if self.reject:
+            raise self.reject
+        self.created.append(doc)
+        return "HR-LAP-9"
