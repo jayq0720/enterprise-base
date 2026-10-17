@@ -128,5 +128,124 @@
     "workflow_data": null,
     "workflow_name": "EB Wiki Review",
     "workflow_state_field": "eb_review_state"
+  },
+  {
+    "doctype": "Workflow",
+    "name": "EB Leave Review",
+    "workflow_name": "EB Leave Review",
+    "document_type": "Leave Application",
+    "is_active": 1,
+    "workflow_state_field": "eb_leave_state",
+    "send_email_alert": 0,
+    "states": [
+      {
+        "state": "EB Leave Manager",
+        "allow_edit": "Employee",
+        "doc_status": "0",
+        "update_field": "status",
+        "update_value": "Open"
+      },
+      {
+        "state": "EB Leave HR",
+        "allow_edit": "HR Manager",
+        "doc_status": "0",
+        "update_field": "status",
+        "update_value": "Open"
+      },
+      {
+        "state": "EB Leave Returned",
+        "allow_edit": "Employee",
+        "doc_status": "0",
+        "update_field": "status",
+        "update_value": "Open"
+      },
+      {
+        "state": "EB Leave Approved",
+        "allow_edit": "HR Manager",
+        "doc_status": "1",
+        "update_field": "status",
+        "update_value": "Approved"
+      },
+      {
+        "state": "EB Leave Rejected",
+        "allow_edit": "HR Manager",
+        "doc_status": "1",
+        "update_field": "status",
+        "update_value": "Rejected"
+      },
+      {
+        "state": "EB Leave Cancelled",
+        "allow_edit": "HR Manager",
+        "doc_status": "2",
+        "update_field": "status",
+        "update_value": "Cancelled"
+      }
+    ],
+    "transitions": [
+      {
+        "state": "EB Leave Manager",
+        "action": "EB Manager Approve",
+        "next_state": "EB Leave HR",
+        "allowed": "Leave Approver",
+        "condition": "doc.leave_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave Manager",
+        "action": "EB Return Leave",
+        "next_state": "EB Leave Returned",
+        "allowed": "Leave Approver",
+        "condition": "doc.leave_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave Manager",
+        "action": "EB Reject Leave",
+        "next_state": "EB Leave Rejected",
+        "allowed": "Leave Approver",
+        "condition": "doc.leave_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave HR",
+        "action": "EB HR Approve",
+        "next_state": "EB Leave Approved",
+        "allowed": "HR Manager",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave HR",
+        "action": "EB Return Leave",
+        "next_state": "EB Leave Returned",
+        "allowed": "HR Manager",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave HR",
+        "action": "EB Reject Leave",
+        "next_state": "EB Leave Rejected",
+        "allowed": "HR Manager",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave Returned",
+        "action": "EB Resend Leave",
+        "next_state": "EB Leave Manager",
+        "allowed": "Employee",
+        "condition": "frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") == frappe.session.user",
+        "allow_self_approval": 0
+      },
+      {
+        "state": "EB Leave Approved",
+        "action": "EB Cancel Leave",
+        "next_state": "EB Leave Cancelled",
+        "allowed": "HR Manager",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "allow_self_approval": 0
+      }
+    ]
   }
 ]

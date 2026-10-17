@@ -25,5 +25,35 @@
     "name": "EB Published",
     "style": "",
     "workflow_state_name": "EB Published"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave Manager",
+    "workflow_state_name": "EB Leave Manager"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave HR",
+    "workflow_state_name": "EB Leave HR"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave Returned",
+    "workflow_state_name": "EB Leave Returned"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave Approved",
+    "workflow_state_name": "EB Leave Approved"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave Rejected",
+    "workflow_state_name": "EB Leave Rejected"
+  },
+  {
+    "doctype": "Workflow State",
+    "name": "EB Leave Cancelled",
+    "workflow_state_name": "EB Leave Cancelled"
   }
 ]
