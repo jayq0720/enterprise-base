@@ -1,0 +1,15 @@
+[
+  {
+    "doctype": "Employee Onboarding Template",
+    "name": "EB Synthetic Onboarding",
+    "title": "EB Synthetic Onboarding",
+    "company": null,
+    "department": null,
+    "designation": null,
+    "activities": [
+      {"activity_name": "合成示例：开通账号", "begin_on": 0, "duration": 1, "required_for_employee_creation": 0},
+      {"activity_name": "合成示例：领取设备", "begin_on": 0, "duration": 1, "required_for_employee_creation": 0},
+      {"activity_name": "合成示例：制度学习", "begin_on": 1, "duration": 1, "required_for_employee_creation": 0}
+    ]
+  }
+]
