@@ -41,7 +41,7 @@ docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
   -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh \
   >/tmp/eb-frappe-test.log 2>&1 || {
-    tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 100; exit 1;
+    tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 300; exit 1;
   }
 tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting|越权拒绝通过|不重置技术账号' || true
 mkdir -p artifacts

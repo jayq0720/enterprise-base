@@ -63,8 +63,9 @@ class TestLeaveFlow(FrappeTestCase):
         allocation.insert().submit()
 
     def restore(self, label="Administrator"):
-        frappe.init(site=self.site)
-        frappe.connect()
+        if not getattr(frappe.local, "db", None):
+            frappe.init(site=self.site)
+            frappe.connect()
         frappe.set_user(self.users.get(label, label))
 
     def new_leave(self, day=19, x4=False):
