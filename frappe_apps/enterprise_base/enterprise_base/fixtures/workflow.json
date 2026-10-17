@@ -236,7 +236,7 @@
         "next_state": "EB Leave Manager",
         "allowed": "Employee",
         "condition": "frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") == frappe.session.user",
-        "allow_self_approval": 0
+        "allow_self_approval": 1
       },
       {
         "state": "EB Leave Approved",
