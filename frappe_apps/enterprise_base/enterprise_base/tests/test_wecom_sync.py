@@ -70,10 +70,18 @@ class TestWecomSync(FrappeTestCase):
                 self.assertEqual(sync.sync_now()["skipped"], 1)
                 cfg["full_directory_verified"] = True
                 user.db_set("enabled", 1)
+                with patch.object(sync, "disable_left_user", side_effect=ValueError("private")):
+                    self.assertEqual(sync.sync_now(), {"failed": True})
+                self.assertEqual(frappe.db.get_value("Employee", employee.name, "status"), "Active")
+                self.assertTrue(frappe.db.get_value("User", user.name, "enabled"))
                 self.assertEqual(sync.sync_now()["left"], 1)
                 self.assertEqual(frappe.db.get_value("Employee", employee.name, "status"), "Left")
                 self.assertFalse(frappe.db.get_value("User", user.name, "enabled"))
                 self.assertEqual(sync.sync_now()["left"], 0)
+                employee.db_set("status", "Inactive")
+                user.db_set("enabled", 1)
+                self.assertEqual(sync.sync_now()["left"], 1)
+                self.assertFalse(frappe.db.get_value("User", user.name, "enabled"))
                 upstream.return_value = (
                     {9002: dict(name="invalid,department", parentid=0)},
                     {},
@@ -81,6 +89,9 @@ class TestWecomSync(FrappeTestCase):
                 )
                 self.assertEqual(sync.sync_now()["skipped"], 1)
                 self.assertFalse(frappe.db.exists("Department", {"eb_wecom_department_id": "9002"}))
+                upstream.return_value = (depts, {"new-member": member}, {"new-member"})
+                self.assertEqual(sync.sync_now()["pending"], 1)
+                self.assertFalse(frappe.db.exists("Employee", {"wecom_userid": "new-member"}))
                 upstream.side_effect = ValueError("synthetic-private-value")
                 self.assertEqual(sync.sync_now(), {"failed": True})
                 for value in data["private_samples"] + ["synthetic-private-value"]:
@@ -88,6 +99,13 @@ class TestWecomSync(FrappeTestCase):
                 frappe.set_user(user.name)
                 with self.assertRaises(frappe.PermissionError):
                     sync.sync_now()
+                with patch.object(frappe, "get_roles", return_value=["HR User"]):
+                    with self.assertRaises(frappe.PermissionError):
+                        sync.sync_now()
+                    department = frappe.get_doc("Department", employee.department)
+                    department.eb_wecom_department_id = "9003"
+                    with self.assertRaises(frappe.PermissionError):
+                        department.save(ignore_permissions=True)
         finally:
             frappe.set_user("Administrator")
             frappe.db.delete("Employee", {"name": employee.name})

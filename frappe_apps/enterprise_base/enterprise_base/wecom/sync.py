@@ -33,7 +33,12 @@ def _require(condition):
 
 
 def _text(value):
-    return isinstance(value, str) and bool(value.strip()) and len(value) <= 140
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and len(value) <= 140
+        and not any(c in value for c in "<>\x00\r\n")
+    )
 
 
 def _snapshot(cfg):
@@ -126,7 +131,7 @@ def _apply(cfg, depts, members, ids):
     result["pending"] = len(set(members) - set(bound))
     for employee in employees:
         uid = employee.wecom_userid
-        if not uid or employee.status != "Active":
+        if not uid or employee.status == "Left":
             continue
         if uid not in ids:
             if cfg.get("full_directory_verified") is not True:
@@ -137,7 +142,7 @@ def _apply(cfg, depts, members, ids):
             doc.db_set("status", "Left")
             disable_left_user(doc)
             result["left"] += 1
-        elif uid in members:
+        elif employee.status == "Active" and uid in members:
             row = members[uid]
             targets = [mapped.get(d) for d in set(row["department"])]
             if len(targets) != 1 or not targets[0]:
@@ -188,5 +193,6 @@ def hourly():
 
 @frappe.whitelist(methods=["POST"])
 def sync_now():
-    frappe.only_for("HR Manager")
+    if frappe.session.user != "Administrator" and "HR Manager" not in frappe.get_roles():
+        frappe.throw("仅 HR Manager 可以同步通讯录。", frappe.PermissionError)
     return hourly()
