@@ -323,6 +323,21 @@ class TestX4Duties(FrappeTestCase):
             self.assertEqual(
                 rows, [{"name": designation.name, "eb_responsibilities": "<p>Synthetic duty</p>"}]
             )
+            fields = '["name","eb_responsibilities"]'
+            get("/api/resource/Designation", 403, fields=fields)
+            bad_filters: tuple[object, ...] = (
+                [],
+                None,
+                {},
+                [["name", "=", ""]],
+                [["name", "=", "   "]],
+                [["name", "=", None]],
+                [["eb_responsibilities", "=", "<p>Synthetic duty</p>"]],
+                own + [["eb_responsibilities", "=", "<p>Synthetic duty</p>"]],
+                [["status", "=", "Active"]],
+            )
+            for filters in bad_filters:
+                get("/api/resource/Designation", 403, fields=fields, filters=json.dumps(filters))
             # 岗位只能按名称精确查名称和职责两个字段，不能取整条记录、其它字段或模糊查
             get("/api/resource/Designation", 403, fields='["appraisal_template"]')
             get("/api/resource/Designation", 403, filters=json.dumps(own))
