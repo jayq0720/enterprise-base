@@ -49,7 +49,8 @@ def _snapshot(cfg):
 
     app, directory = token(cfg["app_secret"]), token(cfg["directory_secret"])
     departments = _request("GET", "department/list", params={"access_token": app})["department"]
-    _require(isinstance(departments, list) and 0 < len(departments) <= 100)
+    # 部门数不设上限：department/list 一次返回全部，按客户规模写死上限会让大企业整批失败。
+    _require(isinstance(departments, list) and departments)
     depts: dict[int, dict] = {}
     members: dict[str, dict] = {}
     for row in departments:

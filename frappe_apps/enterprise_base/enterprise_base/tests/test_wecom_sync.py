@@ -130,6 +130,15 @@ class TestWecomSync(FrappeTestCase):
 
         with patch.object(sync, "_request", side_effect=request):
             self.assertEqual(sync._snapshot(cfg)[2], {"synthetic", "other"})
+
+        def many(method, path, **kwargs):
+            # 部门数不设上限：超过 100 个部门也要能完整同步。
+            if path == "department/list":
+                return {"department": [dict(id=i, name=f"d{i}", parentid=0) for i in range(1, 152)]}
+            return request(method, path, **kwargs)
+
+        with patch.object(sync, "_request", side_effect=many):
+            self.assertEqual(len(sync._snapshot(cfg)[0]), 151)
         for defect in ("private", "cursor", "partial"):
 
             def broken(method, path, defect=defect, **kwargs):
