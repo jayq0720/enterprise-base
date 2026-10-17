@@ -1,6 +1,6 @@
 # AGENTS.md：共用开发规范
 
-本仓库由 JQ、Claude、GPT 共同开发。Claude 和 GPT 开工前必须先读完本文件，再读各自的 `CLAUDE.md`、`GPT.md`。
+本仓库由 JQ、Claude、GPT 共同开发，Grok bot 负责测试 PR。Claude 和 GPT 开工前必须先读完本文件，再读各自的 `CLAUDE.md`、`GPT.md`。
 方案依据：《企业基础平台开发方案（第 5 版）》。一句话：**Dify 管 AI，Frappe + Frappe HR + Frappe Wiki 管人和流程，我们只写把两边连起来的 5 个模块（X1–X5）。**
 
 ## 1. 目录归属
@@ -54,8 +54,8 @@
 2. 分支名：`claude/P1-C1-kb-gateway`、`gpt/P0-G1-compose` 这种格式。
 3. 一个 PR 只做一件事，不超过 400 行（不含锁文件、fixtures 导出、测试数据）。
    任务太大要拆成几个 PR 时，每个 PR 的目标分支都是 `main`，按顺序合并；不要把 PR 的目标分支设成上一个 PR 的分支，否则合并后改动进不了 `main`。
-4. PR 描述：做了什么 / 怎么测的 / 任务编号 / 新增依赖及许可证。
-5. 流程：CI 全绿 → 互审（Claude 审 GPT 的 PR，GPT 复看 Claude 的 PR）→ 作者修改 → JQ 合并。不直接推 `main`。
+4. PR 描述按 `.github/pull_request_template.md`：做了什么 / 怎么测的 / 任务编号 / 新增依赖及许可证 / **给 Grok 的测试步骤**。
+5. 流程：CI 全绿 → **Grok bot 按 PR 里的测试步骤实测**（见 `docs/Grok测试说明.md`）→ 互审（Claude 审 GPT 的 PR，GPT 复看 Claude 的 PR）→ 作者按测试和审阅意见修改 → JQ 合并。Grok 报的问题由 PR 作者修，修完 Grok 复测。不直接推 `main`。
 6. 每个 PR 必须带的测试：权限拒绝（无岗位、岗位不符、未授权用户不能登录）；敏感字段不出现在返回、同步结果和日志里；Frappe fixtures 能在空库导入；部署改动附一次成功运行的日志摘要（去掉密钥）。
 
 ### GPT 的代码怎么进仓库
