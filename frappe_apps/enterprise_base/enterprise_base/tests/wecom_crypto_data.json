@@ -1,0 +1,62 @@
+{
+  "source": "Synthetic vector generated with OpenSSL enc -aes-256-cbc -nopad; not a live WeCom request",
+  "token": "synthetic-callback-token",
+  "corpid": "synthetic-corp",
+  "timestamp": "1792278000",
+  "nonce": "123456",
+  "encrypted": "4j/AuRx71kQlxVlzbpsMWLm46Mnar9BezEzzX2KCjX6spJ17fdkpwOK5UZMO0dPulFg8wnGgWor0rrcXM53ppP6B7e7c7A7KnEc1t8Duu7hHytu0xKr6LMD+/x/3CvG9cFTrz31f6DAbtfCzr3b/aDfzLIzIjlWDuv1zyLBAquZG3VhH/53SbVw/Cd411nyzSAAZiVJ/Tj2MpZAvwRq7oWJDknuqpnDly1Oxl/DxzIqwsytAeVXkJOW81cU7LsP1iTJLxsyfx456VrKwbwrRvZNQxcU1WhXE9rvkSX37NBBu3hsd5ii6fuiIOFkJBzKcin7qZGRcNODNGzCIuU6hON8CSHpDyY9L1rc/4Jl+6laQ/M4U74RhDQ2o8SCE36Gl",
+  "signature": "3f33b4e8091929eb5b30310018c647b1dfa02e75",
+  "plaintext": "<xml><ToUserName>synthetic-corp</ToUserName><FromUserName>synthetic-staff</FromUserName><MsgType>event</MsgType><Event>template_card_event</Event><EventKey>approve</EventKey><TaskId>synthetic-task</TaskId><AgentID>1001</AgentID></xml>",
+  "malformed": [
+    {
+      "encrypted": "4j/AuRx71kQlxVlzbpsMWLm46Mnar9BezEzzX2KCjX6spJ17fdkpwOK5UZMO0dPulFg8wnGgWor0rrcXM53ppP6B7e7c7A7KnEc1t8Duu7hHytu0xKr6LMD+/x/3CvG9cFTrz31f6DAbtfCzr3b/aDfzLIzIjlWDuv1zyLBAquZG3VhH/53SbVw/Cd411nyzSAAZiVJ/Tj2MpZAvwRq7oWJDknuqpnDly1Oxl/DxzIqwsytAeVXkJOW81cU7LsP1iTJLxsyfx456VrKwbwrRvZNQxcU1WhXE9rvkSX37NBBu3hsd5ii6fuiIOFkJBzKcin7qZGRcNODNGzCIuU6hON8CSHpDyY9L1rc/4Jl+6lYHIopW6KXCb2SaOZTI7M8l",
+      "signature": "d11c01b07ed220ecf33a8e91f012b11a74a54575"
+    },
+    {
+      "encrypted": "4j/AuRx71kQlxVlzbpsMWLzEkmPrlZKXVNAZKF+u21EI9Db0Hm3Ti+ouoyU+BzZjoMhS3oU/wpH6Zuo2SqA16gMBXzFLrQ1ULSqRmGg3pYc73hObNE1okTPS8/ibvC7RmnNxpaTi3RFEGfgdwSOiGOPX4j0EYQs8tHpQG3mplf9n9c1go3NQ7xVZirkFT7pJPKv3x5EqfEwmCwKz8bFhtjPFUgxiys7NDBWRBYMXfuZ8CuVXPoQ2+doX++G7OD6CXDmbvU+GyXdIOhpQ8Mx0vAMDrfzPms0USwRdQtNSsF8osScz+yIMeYheAlOB2JVSgQg80md3VGobPXKu9n1doy3X7fX7zuBJv8mxsi6mN/ISYWXKVFLH9k2KngkiGU6h",
+      "signature": "29fd618e7beeb8fb2a3dbb4da704cdf6744946ad"
+    },
+    {
+      "encrypted": "4j/AuRx71kQlxVlzbpsMWNkr3jLeiqKtHbRWTZvJZf1BJqxEnYYGCI/2g0A6DotNqsv7pCz09MTj4tZtdIdIlkM+cDq0l+TbiiFksfZAy1S59pEeHPAxxsWgN4Si+kw3g+r8uhlfmkwBnVh9aYBiWRwkAy46eqeEjgMm06EvCDfjsj97vg46v20osm1IRw6ZUeAu2WGH8Ls0axNgE8aB6LnqUJyE5SQW7wTnLHYjJ/bL+iKbJ8X2s0qN0J9EOXVsLxMeFm5apVBuKzyEDGg4O6O8cHMgbee3dSgoT16Q0BATdQa4hsZ9m+j+IEyDoxqkD8UioOUSv7e0OduOoja8XrWR3dLwc/iQBKA/P37ad5K8yWbB/YUtqK8DDoJcLcnU",
+      "signature": "3e2180943fcae07ebd762d15e070af794d765d89"
+    },
+    {
+      "encrypted": "4j/AuRx71kQlxVlzbpsMWLm46Mnar9BezEzzX2KCjX6spJ17fdkpwOK5UZMO0dPulFg8wnGgWor0rrcXM53ppP6B7e7c7A7KnEc1t8Duu7hHytu0xKr6LMD+/x/3CvG9cFTrz31f6DAbtfCzr3b/aDfzLIzIjlWDuv1zyLBAquZG3VhH/53SbVw/Cd411nyzSAAZiVJ/Tj2MpZAvwRq7oWJDknuqpnDly1Oxl/DxzIqwsytAeVXkJOW81cU7LsP1iTJLxsyfx456VrKwbwrRvZNQxcU1WhXE9rvkSX37NBBu3hsd5ii6fuiIOFkJBzKcVZssLfgUh8bjy1xjozvn4h9vUuCFlSkCMkm3bLps9t0KcIfSaP9B0oZUQZ+GClpO",
+      "signature": "4e586dc0e2e6ec3af77b8cc1298fda40738fb9da"
+    }
+  ],
+  "key_bytes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ]
+}
