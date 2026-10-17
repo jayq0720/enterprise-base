@@ -72,3 +72,9 @@ GPT 不能直接登录服务器时：GPT 写好脚本和步骤，由 JQ 执行�
 ## 6. 节奏
 
 周一 Claude 发本周计划，周五发周报；每阶段末按方案验收。阶段：P0 部署与验证（10-15 – 10-23）、P1 组织与知识（10-26 – 11-13）、P2 流程与 Agent（11-16 – 12-04）、P3 试运行与上线（12-07 – 12-25），12-28 上线。
+
+## Cursor Cloud specific instructions
+
+Cloud Agent 的 install 与 CI 对齐：`uv` 0.11.32、Python 3.12，并对 `services/kb_gateway`、`services/frappe_mcp`、`services/policy_sync`、`tests/e2e`、`frappe_apps/enterprise_base` 执行 `uv sync --frozen --python 3.12`。检查命令以各目录 README 和 `docs/CI.md` 为准。
+
+`make -C deploy verify` 使用已安装的 `docker compose` 做配置渲染，并下载锁定版本的 Caddy 二进制做入口校验；它不启动 Dify 或 Frappe。完整 `make -C deploy up` 需要服务器密钥和较大内存，不要在 Cloud Agent 里运行。
