@@ -28,6 +28,7 @@ fixtures = [
                     "Designation-eb_responsibilities",
                     "Designation-eb_knowledge_spaces",
                     "Employee-wecom_userid",
+                    "Department-eb_wecom_department_id",
                 ],
             ]
         ],
@@ -72,3 +73,4 @@ fixtures.extend(
 )
 
 persistent_cache_keys = ["eb-org-import"]
+scheduler_events = {"hourly": ["enterprise_base.wecom.sync.hourly"]}
