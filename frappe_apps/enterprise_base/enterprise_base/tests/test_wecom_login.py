@@ -52,8 +52,8 @@ class TestWecomLogin(FrappeTestCase):
             frappe.connect()
             frappe.set_user("Administrator")
 
-        def get(path, browser=client, **kwargs):
-            response = browser.get(path, base_url="https://" + site, **kwargs)
+        def get(path, browser=client, scheme="https", **kwargs):
+            response = browser.get(path, base_url=scheme + "://" + site, **kwargs)
             restore()
             return response
 
@@ -91,6 +91,9 @@ class TestWecomLogin(FrappeTestCase):
                 patch.object(login, "_settings", return_value=cfg),
                 patch.object(login.requests, "get", side_effect=upstream) as send,
             ):
+                # 生产经反向代理到 gunicorn 时 scheme 为 http，入口仍须可用。
+                response = get("/api/method/enterprise_base.wecom.login.start", scheme="http")
+                self.assertTrue(response.location.startswith("https://login.work.weixin.qq.com/"))
                 state = start()
                 callback(state, browser=Client(application, Response))
                 send.assert_not_called()

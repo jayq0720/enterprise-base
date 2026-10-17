@@ -87,7 +87,9 @@ def _redirect(location):
 @frappe.whitelist(allow_guest=True, methods=["GET"])
 def start():
     cfg = _settings()
-    if not cfg or frappe.request.scheme != "https" or frappe.request.args:
+    # 生产 gunicorn 不信任代理转发的协议头，request.scheme 恒为 http；
+    # HTTPS 由 callback_url 校验和 __Host- Cookie 保证。
+    if not cfg or frappe.request.args:
         return _redirect("/login?wecom=failed")
     state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     frappe.cache.setex(_key(state), 300, _digest(nonce))
@@ -145,8 +147,7 @@ def callback(code="", state=""):
     frappe.local.cookie_manager.set_cookie(COOKIE, "", max_age=0, secure=True, httponly=True)
     args = frappe.request.args
     if (
-        frappe.request.scheme != "https"
-        or set(args) != {"code", "state"}
+        set(args) != {"code", "state"}
         or any(len(args.getlist(k)) != 1 for k in args)
         or not isinstance(code, str)
         or not 0 < len(code.encode()) <= 512
