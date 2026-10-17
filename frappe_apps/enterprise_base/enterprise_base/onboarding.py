@@ -12,6 +12,20 @@ def configure():
     for right in ("read", "write", "create", "select"):
         update_permission_property(dt, "HR Manager", 0, right, 1)
     frappe.clear_cache(doctype=dt)
+    setup_custom_perms("Task")
+    own = dict(parent="Task", role="HR Manager", permlevel=0, if_owner=1)
+    if not frappe.db.exists("Custom DocPerm", own):
+        frappe.get_doc(
+            dict(
+                doctype="Custom DocPerm",
+                parenttype="DocType",
+                parentfield="permissions",
+                **own,
+                read=1,
+                share=1,
+            )
+        ).insert()
+    frappe.clear_cache(doctype="Task")
 
 
 def generate(doc, method=None):

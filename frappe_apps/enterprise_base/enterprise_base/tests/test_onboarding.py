@@ -57,6 +57,7 @@ class TestOnboarding(FrappeTestCase):
         template.company, template.designation = "P2 Synthetic", self.designation
         for activity in template.activities:
             activity.user = self.hr
+        template.activities[-1].user = self.clerk
         self.template = template.insert()
 
     def employee(self, applicant=True):
@@ -91,19 +92,29 @@ class TestOnboarding(FrappeTestCase):
             tasks = [a.task for a in onboarding.activities]
             self.assertTrue(all(tasks))
             self.assertEqual(frappe.db.count("Task", {"project": onboarding.project}), 3)
-            for task in tasks:
+            for activity in onboarding.activities:
+                task = activity.task
                 self.assertEqual(
                     frappe.db.count(
                         "ToDo",
                         {
                             "reference_type": "Task",
                             "reference_name": task,
-                            "allocated_to": self.hr,
+                            "allocated_to": activity.user,
                             "status": "Open",
                         },
                     ),
                     1,
                 )
+            self.assertTrue(
+                frappe.has_permission(doc=frappe.get_doc("Task", tasks[-1]), user=self.clerk)
+            )
+            frappe.set_user("Administrator")
+            unrelated = frappe.get_doc(
+                dict(doctype="Task", subject="Unrelated synthetic task")
+            ).insert()
+            self.assertFalse(frappe.has_permission(doc=unrelated, user=self.hr))
+            frappe.set_user(self.hr)
             employee.save()
             self.assertEqual(frappe.db.count("Employee Onboarding", {"employee": employee.name}), 1)
             self.assertEqual(frappe.db.count("Task", {"project": onboarding.project}), 3)
@@ -133,6 +144,7 @@ class TestOnboarding(FrappeTestCase):
         employee.save()
         self.assertFalse(frappe.db.exists("Employee Onboarding", {"employee": employee.name}))
         offer = frappe.copy_doc(self.offer)
+        offer.docstatus = 0
         offer.amended_from = self.offer.name
         offer.insert().submit()
         frappe.set_user(self.hr)
