@@ -158,6 +158,10 @@ class TestLeaveFlow(FrappeTestCase):
             self.assert_state(doc, "EB Leave Approved", "Approved", 1)
         self.restore()
         self.assertEqual(get_leave_balance_on(self.employee.name, self.leave_type, "2026-10-21"), 8)
+        doc = self.action(doc, "hr", "EB Cancel Leave")
+        self.assert_state(doc, "EB Leave Cancelled", "Cancelled", 2)
+        self.restore()
+        self.assertEqual(get_leave_balance_on(self.employee.name, self.leave_type, "2026-10-21"), 9)
 
     def test_return_reject_and_tampering(self):
         doc = self.new_leave()
@@ -203,3 +207,19 @@ class TestLeaveFlow(FrappeTestCase):
         doc = self.new_leave(20)
         with self.assertRaises(frappe.ValidationError):
             self.action(doc, "manager", "EB Manager Approve")
+
+    def test_department_approver_fallback(self):
+        department = frappe.get_doc(
+            dict(
+                doctype="Department",
+                department_name="Leave " + self.suffix,
+                company=self.employee.company,
+                leave_approvers=[dict(approver=self.users["manager"])],
+            )
+        ).insert()
+        frappe.db.set_value(
+            "Employee", self.employee.name, {"leave_approver": None, "department": department.name}
+        )
+        doc = self.new_leave()
+        self.assertEqual(doc.leave_approver, self.users["manager"])
+        self.assert_state(self.action(doc, "manager", "EB Manager Approve"), "EB Leave HR")

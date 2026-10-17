@@ -1,0 +1,72 @@
+[
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.708787",
+    "name": "EB Send for Review",
+    "workflow_action_name": "EB Send for Review"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.709549",
+    "name": "EB Publish",
+    "workflow_action_name": "EB Publish"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.710309",
+    "name": "EB Return",
+    "workflow_action_name": "EB Return"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-16 13:15:01.711027",
+    "name": "EB Withdraw",
+    "workflow_action_name": "EB Withdraw"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.702104",
+    "name": "EB Cancel Leave",
+    "workflow_action_name": "EB Cancel Leave"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.703304",
+    "name": "EB HR Approve",
+    "workflow_action_name": "EB HR Approve"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.704501",
+    "name": "EB Manager Approve",
+    "workflow_action_name": "EB Manager Approve"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.705704",
+    "name": "EB Reject Leave",
+    "workflow_action_name": "EB Reject Leave"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.706904",
+    "name": "EB Resend Leave",
+    "workflow_action_name": "EB Resend Leave"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow Action Master",
+    "modified": "2026-10-18 05:04:53.708213",
+    "name": "EB Return Leave",
+    "workflow_action_name": "EB Return Leave"
+  }
+]
