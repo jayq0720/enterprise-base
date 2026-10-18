@@ -69,6 +69,7 @@ class FakeHR:
                 "total_leave_days": 2,
                 "status": "Open",
                 "leave_approver_name": "李四",
+                "eb_leave_state": "EB Leave Manager",
             }
         ]
 

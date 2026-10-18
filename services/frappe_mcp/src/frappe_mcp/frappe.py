@@ -27,6 +27,8 @@ LEAVE_FIELDS = [
     "status",
     "leave_approver_name",
     "posting_date",
+    # 两级审批（GPT P2-G1 工作流 EB Leave Review）的当前环节
+    "eb_leave_state",
 ]
 
 

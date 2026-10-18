@@ -51,6 +51,7 @@ async def test_my_applications_filtered_by_own_employee(settings: Settings) -> N
         "days": 2,
         "status": "Open",
         "approver": "李四",
+        "stage": "manager",
     }
     assert hr.calls == [("apps", [["employee", "=", "E1"], ["docstatus", "<", 2]])]
 
@@ -59,8 +60,21 @@ async def test_pending_approval_uses_own_user(settings: Settings) -> None:
     tools, hr = make(settings)
     out = await tools.pending_my_approval(tok("lisi"))
     assert out["applications"][0]["applicant"] == "张三"
-    filters = hr.calls[0][1]
-    assert ["leave_approver", "=", "ls@example.com"] in filters  # type: ignore[operator]
+    # 两级审批各查一次：主管环节按 leave_approver，HR 环节按 eb_hr_approver，都只查本人
+    assert [c[1] for c in hr.calls] == [
+        [
+            ["leave_approver", "=", "ls@example.com"],
+            ["eb_leave_state", "=", "EB Leave Manager"],
+            ["docstatus", "=", 0],
+        ],
+        [
+            ["eb_hr_approver", "=", "ls@example.com"],
+            ["eb_leave_state", "=", "EB Leave HR"],
+            ["docstatus", "=", 0],
+        ],
+    ]
+    # 同一张单两边都查到时只列一次
+    assert len(out["applications"]) == 1
     # 不把审批人邮箱返回给模型
     assert "ls@example.com" not in str(out)
 

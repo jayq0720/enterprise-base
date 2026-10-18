@@ -74,15 +74,23 @@ class Tools:
         async def run(emp: Employee) -> dict[str, Any]:
             if not emp.user_id:
                 return {"employee_name": emp.employee_name, "applications": []}
-            rows = await self._hr.leave_applications(
-                [
-                    ["leave_approver", "=", emp.user_id],
-                    ["status", "=", "Open"],
-                    ["docstatus", "=", 0],
-                ],
-                self._s.list_limit,
-            )
-            items = [{**_leave(r), "applicant": r.get("employee_name") or ""} for r in rows]
+            # 两级审批：主管只看停在主管环节的单，HR 只看已转到 HR 环节、指定给自己的单
+            rows: list[dict[str, Any]] = []
+            for field, state in (("leave_approver", STATE_MANAGER), ("eb_hr_approver", STATE_HR)):
+                rows += await self._hr.leave_applications(
+                    [
+                        [field, "=", emp.user_id],
+                        ["eb_leave_state", "=", state],
+                        ["docstatus", "=", 0],
+                    ],
+                    self._s.list_limit,
+                )
+            unique = list({r.get("name"): r for r in rows}.values())
+            unique.sort(key=lambda r: r.get("from_date") or "", reverse=True)
+            items = [
+                {**_leave(r), "applicant": r.get("employee_name") or ""}
+                for r in unique[: self._s.list_limit]
+            ]
             return {"employee_name": emp.employee_name, "applications": items}
 
         return await self._as_user(session_token, run)
@@ -206,6 +214,10 @@ class Tools:
             return {"error": UNAVAILABLE}
 
 
+STATE_MANAGER, STATE_HR, STATE_RETURNED = "EB Leave Manager", "EB Leave HR", "EB Leave Returned"
+_STAGES = {STATE_MANAGER: "manager", STATE_HR: "hr", STATE_RETURNED: "returned"}
+
+
 def _leave(r: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": r.get("name") or "",
@@ -215,6 +227,8 @@ def _leave(r: dict[str, Any]) -> dict[str, Any]:
         "days": r.get("total_leave_days") or 0,
         "status": r.get("status") or "",
         "approver": r.get("leave_approver_name") or "",
+        # 审批中的单停在哪个环节：manager 主管、hr HR、returned 退回本人修改；其余为空
+        "stage": _STAGES.get(r.get("eb_leave_state") or "", ""),
     }
 
 

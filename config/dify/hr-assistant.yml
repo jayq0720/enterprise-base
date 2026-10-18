@@ -658,11 +658,13 @@ workflow:
                   return {"text": "你最近没有请假申请。"}
               status = {"Open": "审批中", "Approved": "已批准", "Rejected": "已驳回", "Cancelled": "已取消"}
               lines = ["你最近的请假申请："]
+              stage = {"manager": "主管审批中", "hr": "HR 审批中", "returned": "已退回，请修改后重新提交"}
               for r in rows:
-                  approver = f"，审批人 {r['approver']}" if r.get("approver") else ""
+                  text = stage.get(r.get("stage")) or status.get(r.get("status"), r.get("status"))
+                  approver = f"，审批人 {r['approver']}" if r.get("approver") and r.get("stage") not in ("hr", "returned") else ""
                   lines.append(
                       f"· {r['leave_type']} {r['from_date']} 至 {r['to_date']}，{('%g' % (r.get('days') or 0))} 天，"
-                      f"{status.get(r.get('status'), r.get('status'))}{approver}（{r['id']}）"
+                      f"{text}{approver}（{r['id']}）"
                   )
               return {"text": "\n".join(lines)}
         variables:
