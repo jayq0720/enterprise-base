@@ -24,9 +24,10 @@ services:
       - /dev/null:/app/run.log
       - wechat_data:/app/data
       - ./data/plugins.json:/app/plugins/plugins.json:ro
-    networks: [edge]
+    networks: [edge, wecom-callback]
 networks:
   edge: {name: "${EB_PROJECT:-eb}_edge"}
+  wecom-callback: {name: "${EB_PROJECT:-eb}_wecom_callbacks", internal: true}
 volumes:
   caddy_data:
   caddy_config:

@@ -240,7 +240,7 @@ def validate(work):
     require(configuration(values) == {"enabled": False}, "旧配置未默认关闭审批卡片。")
     cards = {**values, "EB_WECOM_CALLBACK_MODE": "approvals", "EB_SCHEME": "https",
              "WECHATCOM_CORP_ID": "synthetic", "WECHATCOMAPP_AGENT_ID": "1001",
-             "WECHATCOMAPP_SECRET": "synthetic-secret", "WECHATCOMAPP_TOKEN": "synthetic-token",
+             "WECHATCOMAPP_SECRET": "synthetic-secret", "WECHATCOMAPP_TOKEN": "synthetic-token", "DIFY_API_KEY": "synthetic-key",
              "WECHATCOMAPP_AES_KEY": base64.b64encode(bytes(range(32))).decode().rstrip("=")}
     require(configuration(cards)["enabled"] is True, "合法卡片配置未通过。")
     for key, value in (("WECHATCOMAPP_SECRET", ""), ("WECHATCOMAPP_AES_KEY", "bad"), ("WECHATCOMAPP_AGENT_ID", "bad")):
@@ -286,6 +286,8 @@ def validate(work):
             services = model["services"]
             if stack == "edge":
                 caddy, wechat = services["caddy"], services["wechat"]
+                require(set(wechat["networks"]) == {"edge", "wecom-callback"} and set(caddy["networks"]) == {"edge"}
+                        and model["networks"]["wecom-callback"]["internal"], "聊天桥接专用网络或入口隔离错误。")
                 require(caddy["environment"]["DIFY_ADDRESS"] == f"{scheme}://dify.{domain}",
                         "域名/协议未正确传递到入口。")
                 require(all(p["host_ip"] == bind for p in caddy["ports"]), "入口绑定地址未正确传递。")
@@ -319,6 +321,11 @@ def validate(work):
                         and model["networks"]["ssrf_proxy_network"]["internal"], "Sandbox 隔离网络被放宽。")
                 reject_mutations(model)
             else:
+                if callback_mode == "approvals":
+                    require(set(services["backend"]["networks"]) == {"default", "wecom-callback"}
+                            and model["networks"]["wecom-callback"]["external"]
+                            and model["networks"]["wecom-callback"]["name"] == project + "_wecom_callbacks",
+                            "后端无法经专用网络桥接聊天，或网络边界错误。")
                 require((services["frontend"].get("logging", {}).get("driver") == "none") == (callback_mode == "approvals"),
                         "审批回调未禁止 Nginx 完整查询日志。")
                 require(services["frontend"]["environment"]["FRAPPE_SITE_NAME_HEADER"] == f"hr.{domain}",

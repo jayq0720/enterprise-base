@@ -35,6 +35,8 @@ def configuration(values):
     cfg = {key: values[source] for key, source in keys.items()}
     if (
         not all(cfg.values())
+        or not values.get("DIFY_API_KEY")
+        or values["DIFY_API_KEY"] == "CHANGE_ME"
         or any(v == "CHANGE_ME" for v in cfg.values())
         or not re.fullmatch(r"[1-9][0-9]*", cfg["agentid"])
     ):
@@ -83,13 +85,35 @@ frappe.destroy()
 def main():
     try:
         if len(sys.argv) not in (2, 3) or (
-            len(sys.argv) == 3 and sys.argv[2] != "--check"
+            len(sys.argv) == 3 and sys.argv[2] not in {"--check", "--network"}
         ):
             raise ValueError
         values = settings(sys.argv[1])
         cfg = configuration(values)
         if len(sys.argv) > 2 and sys.argv[2] == "--check":
             print("企业微信卡片配置格式通过（未输出配置，未修改站点）。")
+            return
+        if len(sys.argv) > 2 and sys.argv[2] == "--network":
+            if cfg["enabled"]:
+                result = subprocess.run(
+                    [
+                        "docker",
+                        "compose",
+                        "--env-file",
+                        sys.argv[1],
+                        "-f",
+                        "docker-compose.yml",
+                        "--profile",
+                        "wechat",
+                        "up",
+                        "-d",
+                        "wechat",
+                    ],
+                    capture_output=True,
+                    check=False,
+                )
+                if result.returncode:
+                    raise ValueError
             return
         result = subprocess.run(
             [

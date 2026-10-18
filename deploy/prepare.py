@@ -189,6 +189,9 @@ if callback_mode == "approvals":
     # 官方 Nginx 默认记录完整查询串；不持久化 GET 验证密文和签名。
     hr["services"]["frontend"]["logging"] = {"driver": "none"}
 hr["networks"] = {"default": {}, "edge": edge}
+if callback_mode == "approvals":
+    hr["networks"]["wecom-callback"] = {"external": True, "name": f"{project}_wecom_callbacks"}
+    hr["services"]["backend"]["networks"] = ["default", "wecom-callback"]
 hr["volumes"].update({"db": {}, "cache": {}, "queue": {}, "logs": {}})
 for svc in hr["services"].values():
     if svc.get("image") == LOCK["frappe_image"]:
