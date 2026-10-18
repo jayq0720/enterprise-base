@@ -202,7 +202,7 @@ class TestLeaveFlow(FrappeTestCase):
             get_leave_balance_on(self.employee.name, self.leave_type, "2026-10-21"), 10
         )
 
-    def test_self_approval_and_missing_hr_rejected(self):
+    def test_self_approval_missing_and_duplicate_approvers_rejected(self):
         frappe.db.set_value("Employee", self.employee.name, "leave_approver", self.users["staff"])
         body = self.body(19)
         body["leave_approver"] = self.users["staff"]
@@ -211,16 +211,18 @@ class TestLeaveFlow(FrappeTestCase):
         with self.assertRaises(frappe.ValidationError):
             self.action(doc, "staff", "EB Manager Approve")
         self.restore()
-        frappe.get_doc("User", self.users["staff"]).add_roles("HR User")
-        for hr in (None, self.users["staff"]):
+        for label in ("staff", "manager"):
+            frappe.get_doc("User", self.users[label]).add_roles("HR User")
+        for day, hr in enumerate((None, self.users["staff"], self.users["manager"]), 20):
             frappe.db.set_value(
                 "Employee",
                 self.employee.name,
                 {"leave_approver": self.users["manager"], "eb_hr_approver": hr},
             )
-            doc = self.new_leave(20 if hr is None else 21)
+            doc = self.new_leave(day)
             with self.assertRaises(frappe.ValidationError):
                 self.action(doc, "manager", "EB Manager Approve")
+            self.assert_state(doc, "EB Leave Manager")
 
     def test_department_approver_fallback(self):
         department = frappe.get_doc(

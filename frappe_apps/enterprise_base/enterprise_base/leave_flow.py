@@ -84,14 +84,7 @@ def validate(doc, method=None):
         for f in ("employee", "leave_approver", "eb_hr_approver", "company")
     ):
         deny()
-    protected = (
-        "leave_type",
-        "from_date",
-        "to_date",
-        "half_day",
-        "half_day_date",
-        "description",
-    )
+    protected = "leave_type from_date to_date half_day half_day_date description".split()
     changed = any(doc.get(f) != old.get(f) for f in protected)
     if changed and not (old.eb_leave_state == state == "EB Leave Returned" and user == owner):
         deny()
@@ -109,8 +102,9 @@ def validate(doc, method=None):
             or not frappe.db.get_value("User", hr, "enabled")
             or not set(frappe.get_roles(hr)) & {"HR User", "HR Manager"}
             or hr == owner
+            or hr == doc.leave_approver
         ):
-            frappe.throw("请先由 HR Manager 在员工档案配置有效且非本人的 HR 审批人。")
+            frappe.throw("请先由 HR Manager 配置有效且非申请人本人、非主管的 HR 审批人。")
 
 
 def deny():
