@@ -185,6 +185,13 @@ def x4_api():
                     and bool(form.get("fields"))
                     and not form.get("order_by")
                 )
+            if dt == "Designation":
+                # 只允许按非空岗位名精确读取，空过滤不能退化为枚举全部职责。
+                allowed = (
+                    allowed
+                    and bool(filters)
+                    and all(f[0] == "name" and bool(f[2].strip()) for f in filters)
+                )
             allowed = allowed and not (
                 set(form) - {"fields", "filters", "limit_page_length", "limit_start", "order_by"}
             )
