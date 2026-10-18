@@ -2,11 +2,10 @@
 
 import base64
 import hashlib
-import importlib
 
 import frappe
 import requests
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, NotFound
 from werkzeug.wrappers import Response
 
 PATH = "/api/method/enterprise_base.wecom.callback.receive"
@@ -15,8 +14,15 @@ LIMIT = 65536
 
 def guard():
     req = frappe.request
+    aliases = {PATH, PATH.replace("/api/", "/api/v1/"), PATH.replace("/api/", "/api/v2/")}
+    if req.path.rstrip("/") in aliases or frappe.form_dict.get("cmd") == PATH.rsplit("/", 1)[1]:
+        validate_request()
+
+
+def validate_request():
+    req = frappe.request
     if req.path != PATH:
-        return
+        raise NotFound("企业微信回调地址无效。")
     fields = {"msg_signature", "timestamp", "nonce"}
     if req.method == "GET":
         fields.add("echostr")
@@ -39,11 +45,15 @@ def guard():
 
 
 def protocol():
-    return importlib.import_module("enterprise_base.wecom.crypto")
+    from enterprise_base.wecom import crypto  # type: ignore[attr-defined]
+
+    return crypto
 
 
 def approve(event):
-    return importlib.import_module("enterprise_base.wecom.card_actions").apply(event)
+    from enterprise_base.wecom.card_actions import apply
+
+    return apply(event)
 
 
 def reply(body=b"", status=200):
@@ -113,7 +123,7 @@ def chat(event, body, args, codec):
 
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def receive(**_ignored):
-    guard()
+    validate_request()
     cfg = frappe.conf.get("eb_wecom_cards")
     if (
         not isinstance(cfg, dict)
@@ -156,4 +166,5 @@ def receive(**_ignored):
     except Exception:
         # 禁止 Frappe 错误快照保存原始请求或异常；审批拒绝由处理器回滚保存点。
         frappe.db.rollback()
+        frappe.logger("wecom_cards").info("leave=- action=callback result=rejected")
         return reply(status=403)

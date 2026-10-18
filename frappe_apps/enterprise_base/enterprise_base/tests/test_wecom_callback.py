@@ -1,5 +1,7 @@
 """真实 HTTP 分流/拒绝；协议与动作接口用替代对象，非企业微信联测。"""
 
+import base64
+import time
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -64,6 +66,21 @@ class TestWecomCallback(FrappeTestCase):
             disabled = cfg.pop("enabled")
             self.assertEqual(request().status_code, 503)
             cfg["enabled"] = disabled
+            for path in (
+                callback.PATH + "/",
+                callback.PATH.replace("/api/", "/api/v1/"),
+                callback.PATH.replace("/api/", "/api/v2/"),
+                "/",
+            ):
+                response = client.post(
+                    path,
+                    query_string={**args, "cmd": callback.PATH.rsplit("/", 1)[1]},
+                    headers={"Host": site, "Cookie": "sid=synthetic"},
+                    data=b"<xml/>",
+                    content_type="application/xml",
+                )
+                self.assertEqual(response.status_code, 404)
+            codec.decrypt.assert_not_called()
             for query in (
                 {**args, "cmd": "frappe.auth.get_logged_user"},
                 [(k, v) for k, v in args.items()] + [("nonce", "duplicate")],
@@ -95,6 +112,80 @@ class TestWecomCallback(FrappeTestCase):
             self.assertEqual(request().status_code, 503)
             self.assertEqual(forward.call_count, 2)
             self.assertNotIn("synthetic-private-error", str(logger.mock_calls))
+        if not getattr(frappe.local, "db", None):
+            frappe.init(site=site)
+            frappe.connect()
+        frappe.set_user("Administrator")
+
+    def test_real_signature_http(self):
+        try:
+            crypto = callback.protocol()
+        except ImportError:
+            self.skipTest("须先合并 #53；跳过不计作真实签名 HTTP 验收。")
+        site = frappe.local.site
+        cfg = dict(
+            enabled=True,
+            corpid="synthetic-corp",
+            agentid="1001",
+            token="synthetic-token",
+            aes_key=base64.b64encode(bytes(range(32))).decode().rstrip("="),
+        )
+        original_guard = callback.guard
+
+        def guard():
+            frappe.conf.eb_wecom_cards = cfg
+            original_guard()
+
+        client = Client(application, Response, use_cookies=False)
+
+        def request(message, method="POST", wrong_corp=False, **changes):
+            outer = crypto.encrypt(
+                message,
+                token=cfg["token"],
+                key=cfg["aes_key"],
+                corpid="wrong" if wrong_corp else cfg["corpid"],
+            )
+            fields = crypto.xml_fields(outer)
+            args = dict(
+                msg_signature=fields["MsgSignature"],
+                timestamp=fields["TimeStamp"],
+                nonce=fields["Nonce"],
+            )
+            if method == "GET":
+                args["echostr"] = fields["Encrypt"]
+            args.update(changes)
+            if "timestamp" in changes:
+                args["msg_signature"] = crypto.signature(
+                    cfg["token"], args["timestamp"], args["nonce"], fields["Encrypt"]
+                )
+            return client.open(
+                callback.PATH,
+                method=method,
+                query_string=args,
+                headers={"Host": site},
+                content_type="application/xml",
+                data=outer if method == "POST" else None,
+            )
+
+        with (
+            patch.object(callback, "guard", side_effect=guard),
+            patch.object(callback, "forward", return_value=b"success") as forward,
+        ):
+            self.assertEqual(request(b"synthetic-echo", "GET").data, b"synthetic-echo")
+            message = (
+                b"<xml><ToUserName>synthetic-corp</ToUserName><AgentID>1001</AgentID>"
+                b"<MsgType>text</MsgType><Content><![CDATA[look <!-- <!DOCTYPE html> here]]>"
+                b"</Content></xml>"
+            )
+            self.assertEqual(request(message).data, b"success")
+            self.assertEqual(forward.call_count, 1)
+            for changes in (
+                dict(msg_signature="0" * 40),
+                dict(timestamp=str(int(time.time()) - 301)),
+                dict(wrong_corp=True),
+            ):
+                self.assertEqual(request(message, **changes).status_code, 403)
+            self.assertEqual(forward.call_count, 1)
         if not getattr(frappe.local, "db", None):
             frappe.init(site=site)
             frappe.connect()
