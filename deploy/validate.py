@@ -12,11 +12,12 @@ import sys
 import tempfile
 
 from caddy_check import verify_access
+from wecom_cards import configuration
 
 ROOT = Path(__file__).resolve().parent
 COMPOSE = shlex.split(os.environ.get("EB_COMPOSE_COMMAND", "docker compose"))
 FILES = ("prepare.py", ".env.example", "upstream.lock.json", "apps.lock.json", "caddy.lock.json",
-         "docker-compose.yml", "frappe-services.yaml", "Caddyfile")
+         "docker-compose.yml", "frappe-services.yaml", "Caddyfile", "wecom_cards.py")
 
 
 def require(condition, message):
@@ -236,6 +237,28 @@ def validate(work):
     incomplete.write_text("".join(f"{k}={v}\n" for k, v in values.items() if k != "EB_ADMIN_ALLOW_CIDRS"))
     prepare("check", str(incomplete))
     incomplete.unlink()
+    require(configuration(values) == {"enabled": False}, "旧配置未默认关闭审批卡片。")
+    cards = {**values, "EB_WECOM_CALLBACK_MODE": "approvals", "EB_SCHEME": "https",
+             "WECHATCOM_CORP_ID": "synthetic", "WECHATCOMAPP_AGENT_ID": "1001",
+             "WECHATCOMAPP_SECRET": "synthetic-secret", "WECHATCOMAPP_TOKEN": "synthetic-token", "DIFY_API_KEY": "synthetic-key",
+             "WECHATCOMAPP_AES_KEY": base64.b64encode(bytes(range(32))).decode().rstrip("=")}
+    require(configuration(cards)["enabled"] is True, "合法卡片配置未通过。")
+    for key, value in (("WECHATCOMAPP_SECRET", ""), ("WECHATCOMAPP_AES_KEY", "bad"), ("WECHATCOMAPP_AGENT_ID", "bad")):
+        try:
+            configuration({**cards, key: value})
+        except ValueError:
+            continue
+        raise RuntimeError("无效卡片配置未被拒绝。")
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in cards.items()))
+    incomplete.chmod(0o600)
+    run([sys.executable, "wecom_cards.py", str(incomplete), "--check"], work)
+    incomplete.chmod(0o644)
+    run([sys.executable, "wecom_cards.py", str(incomplete), "--check"], work, success=False)
+    incomplete.chmod(0o600)
+    for invalid in ("other", "approvals"):
+        incomplete.write_text("".join(f"{k}={v}\n" for k, v in {**values, "EB_WECOM_CALLBACK_MODE": invalid}.items()))
+        prepare("check", str(incomplete), success=False)
+    incomplete.unlink()
     stacks = (("edge", "secrets/.env", "docker-compose.yml", "wechat"),
               ("dify", "secrets/dify.env", "data/dify/docker/eb-compose.yaml", None),
               ("frappe", "secrets/.env", "data/frappe/eb-compose.yaml", "bootstrap"))
@@ -244,6 +267,8 @@ def validate(work):
             ("eb-local-recheck", "localhost", "http", "127.0.0.1", "203.0.113.0/24"),
             ("eb-public-allow", "example.invalid", "https", "0.0.0.0", "127.0.0.1/32")):
         values.update(EB_PROJECT=project, EB_DOMAIN=domain, EB_SCHEME=scheme, EB_BIND=bind, EB_ADMIN_ALLOW_CIDRS=cidrs)
+        callback_mode = "approvals" if scheme == "https" else "bridge"
+        values["EB_WECOM_CALLBACK_MODE"] = callback_mode
         private.write_text("".join(f"{k}={v}\n" for k, v in values.items()))
         output += prepare("secrets/.env")
         for stack, environment, file, profile in stacks:
@@ -261,18 +286,20 @@ def validate(work):
             services = model["services"]
             if stack == "edge":
                 caddy, wechat = services["caddy"], services["wechat"]
+                require(set(wechat["networks"]) == {"edge", "wecom-callback"} and set(caddy["networks"]) == {"edge"}
+                        and model["networks"]["wecom-callback"]["internal"], "聊天桥接专用网络或入口隔离错误。")
                 require(caddy["environment"]["DIFY_ADDRESS"] == f"{scheme}://dify.{domain}",
                         "域名/协议未正确传递到入口。")
                 require(all(p["host_ip"] == bind for p in caddy["ports"]), "入口绑定地址未正确传递。")
                 require(caddy["environment"]["EB_ADMIN_ALLOW_CIDRS"] == cidrs, "管理员白名单未正确传递。")
                 require(any(Path(m["source"]).resolve() == (work / "data/Caddyfile").resolve() and m["target"] == "/etc/caddy/Caddyfile"
                             and m.get("read_only") for m in caddy["volumes"]), "入口未挂载生成的 Caddy 配置。")
-                verify_access(work, caddy["environment"], bind)
+                verify_access(work, caddy["environment"], bind, callback_mode=callback_mode)
                 generated = (work / "data/Caddyfile").read_text()
                 incorrect = ((work / "Caddyfile").read_text() if bind == "127.0.0.1"
                              else generated.replace("import admin_only", ""))
                 try:
-                    verify_access(work, caddy["environment"], bind, incorrect, run_probe=False)
+                    verify_access(work, caddy["environment"], bind, incorrect, run_probe=False, callback_mode=callback_mode)
                 except RuntimeError:
                     pass
                 else:
@@ -294,6 +321,13 @@ def validate(work):
                         and model["networks"]["ssrf_proxy_network"]["internal"], "Sandbox 隔离网络被放宽。")
                 reject_mutations(model)
             else:
+                if callback_mode == "approvals":
+                    require(set(services["backend"]["networks"]) == {"default", "wecom-callback"}
+                            and model["networks"]["wecom-callback"]["external"]
+                            and model["networks"]["wecom-callback"]["name"] == project + "_wecom_callbacks",
+                            "后端无法经专用网络桥接聊天，或网络边界错误。")
+                require((services["frontend"].get("logging", {}).get("driver") == "none") == (callback_mode == "approvals"),
+                        "审批回调未禁止 Nginx 完整查询日志。")
                 require(services["frontend"]["environment"]["FRAPPE_SITE_NAME_HEADER"] == f"hr.{domain}",
                         "Frappe 站点域名未传递。")
                 require("edge" not in services["backend"]["networks"], "Frappe 后端直接接入入口网络。")

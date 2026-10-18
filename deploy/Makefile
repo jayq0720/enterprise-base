@@ -6,7 +6,7 @@ RUN = $(PYTHON) prepare.py
 EDGE = $(DOCKER) compose --env-file $(ENV) -f docker-compose.yml
 DIFY = $(DOCKER) compose --env-file secrets/dify.env -f data/dify/docker/eb-compose.yaml
 HR = $(DOCKER) compose --env-file $(ENV) -f data/frappe/eb-compose.yaml
-.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant
+.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant wecom-cards
 init:
 	$(RUN) init
 prepare:
@@ -24,12 +24,17 @@ up: config
 	$(RUN) check $(ENV)
 	$(DOCKER) image inspect enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0 >/dev/null 2>&1 || $(MAKE) build
 	$(EDGE) up -d --force-recreate caddy
+	$(PYTHON) wecom_cards.py $(ENV) --network
 	$(DIFY) up -d --wait --wait-timeout 600
 	$(HR) up -d --wait --wait-timeout 600
 	$(HR) run --rm create-site
 wechat: prepare
 	$(RUN) wechat $(ENV)
 	$(EDGE) --profile wechat up -d wechat
+wecom-cards: wechat
+	$(PYTHON) wecom_cards.py $(ENV)
+	$(HR) up -d --force-recreate frontend backend queue-short queue-long scheduler
+	$(EDGE) up -d --force-recreate caddy
 status:
 	$(EDGE) --profile wechat ps
 	$(DIFY) ps
