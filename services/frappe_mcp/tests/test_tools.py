@@ -79,6 +79,40 @@ async def test_pending_approval_uses_own_user(settings: Settings) -> None:
     assert "ls@example.com" not in str(out)
 
 
+async def test_pending_approval_stages_from_separate_queries(settings: Settings) -> None:
+    tools, hr = make(settings)
+
+    def row(name: str, state: str, start: str) -> dict[str, Any]:
+        return {"name": name, "employee_name": name, "from_date": start, "eb_leave_state": state}
+
+    by_field = {
+        "leave_approver": [row("主管单", "EB Leave Manager", "2026-10-20")],
+        "eb_hr_approver": [row("HR单", "EB Leave HR", "2026-10-25")],
+    }
+
+    async def apps(filters: list[list[object]], limit: int) -> list[dict[str, Any]]:
+        return by_field[str(filters[0][0])]
+
+    hr.leave_applications = apps  # type: ignore[method-assign]
+    out = await tools.pending_my_approval(tok("lisi"))
+    # 两个环节各自的单都列出，按开始日期倒序，阶段分别标出
+    assert [(a["applicant"], a["stage"]) for a in out["applications"]] == [
+        ("HR单", "hr"),
+        ("主管单", "manager"),
+    ]
+
+
+async def test_returned_leave_shows_stage(settings: Settings) -> None:
+    tools, hr = make(settings)
+
+    async def apps(filters: list[list[object]], limit: int) -> list[dict[str, Any]]:
+        return [{"name": "HR-LAP-2", "status": "Open", "eb_leave_state": "EB Leave Returned"}]
+
+    hr.leave_applications = apps  # type: ignore[method-assign]
+    out = await tools.my_leave_applications(tok("zhangsan"))
+    assert out["applications"][0]["stage"] == "returned"
+
+
 async def test_frappe_down(settings: Settings) -> None:
     tools, hr = make(settings)
     hr.down = True
