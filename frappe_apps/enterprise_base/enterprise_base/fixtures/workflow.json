@@ -248,7 +248,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 1
       },
       {
         "action": "EB Return Leave",
@@ -261,7 +262,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 2
       },
       {
         "action": "EB Reject Leave",
@@ -274,7 +276,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 3
       },
       {
         "action": "EB HR Approve",
@@ -287,7 +290,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 4
       },
       {
         "action": "EB Return Leave",
@@ -300,7 +304,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 5
       },
       {
         "action": "EB Reject Leave",
@@ -313,7 +318,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 6
       },
       {
         "action": "EB Resend Leave",
@@ -326,7 +332,8 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Returned",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 7
       },
       {
         "action": "EB Cancel Leave",
@@ -339,7 +346,64 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Approved",
-        "workflow_builder_id": null
+        "workflow_builder_id": null,
+        "idx": 8
+      },
+      {
+        "action": "EB HR Approve",
+        "allow_self_approval": 0,
+        "allowed": "HR User",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "next_state": "EB Leave Approved",
+        "parent": "EB Leave Review",
+        "parentfield": "transitions",
+        "parenttype": "Workflow",
+        "send_email_to_creator": 0,
+        "state": "EB Leave HR",
+        "workflow_builder_id": null,
+        "idx": 9
+      },
+      {
+        "action": "EB Return Leave",
+        "allow_self_approval": 0,
+        "allowed": "HR User",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "next_state": "EB Leave Returned",
+        "parent": "EB Leave Review",
+        "parentfield": "transitions",
+        "parenttype": "Workflow",
+        "send_email_to_creator": 0,
+        "state": "EB Leave HR",
+        "workflow_builder_id": null,
+        "idx": 10
+      },
+      {
+        "action": "EB Reject Leave",
+        "allow_self_approval": 0,
+        "allowed": "HR User",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "next_state": "EB Leave Rejected",
+        "parent": "EB Leave Review",
+        "parentfield": "transitions",
+        "parenttype": "Workflow",
+        "send_email_to_creator": 0,
+        "state": "EB Leave HR",
+        "workflow_builder_id": null,
+        "idx": 11
+      },
+      {
+        "action": "EB Cancel Leave",
+        "allow_self_approval": 0,
+        "allowed": "HR User",
+        "condition": "doc.eb_hr_approver == frappe.session.user and frappe.db.get_value(\"Employee\", doc.employee, \"user_id\") != frappe.session.user",
+        "next_state": "EB Leave Cancelled",
+        "parent": "EB Leave Review",
+        "parentfield": "transitions",
+        "parenttype": "Workflow",
+        "send_email_to_creator": 0,
+        "state": "EB Leave Approved",
+        "workflow_builder_id": null,
+        "idx": 12
       }
     ],
     "workflow_data": null,

@@ -52,6 +52,7 @@ doc_events["Wiki Document"] = {"before_validate": "enterprise_base.permissions.w
 doc_events["Leave Application"] = {
     "before_validate": "enterprise_base.leave_flow.validate",
     "before_cancel": "enterprise_base.leave_flow.validate",
+    "before_update_after_submit": "enterprise_base.leave_flow.validate",
 }
 doc_events["Version"] = {"before_insert": "enterprise_base.permissions.redact_version"}
 doc_events["User"] = {"on_update": "enterprise_base.permissions.hr_scope"}

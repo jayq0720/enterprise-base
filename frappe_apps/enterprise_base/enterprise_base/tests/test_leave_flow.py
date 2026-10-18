@@ -28,6 +28,7 @@ class TestLeaveFlow(FrappeTestCase):
             "staff": ["Employee", "Leave Approver"],
             "manager": ["Employee", "Leave Approver"],
             "hr": ["Employee", "HR Manager"],
+            "hruser": ["Employee", "HR User"],
             "other": ["Employee", "HR Manager", "Leave Approver"],
         }.items():
             email = f"leave-{label}-{self.suffix}@test.invalid"
@@ -72,6 +73,11 @@ class TestLeaveFlow(FrappeTestCase):
         if x4:
             self.restore()
             user = frappe.get_doc("User", "eb-x4@integration.invalid")
+            previous = (
+                user.enabled,
+                user.api_key,
+                user.get_password("api_secret", raise_exception=False),
+            )
             user.enabled, user.api_key, user.api_secret = (
                 1,
                 "synthetic-flow-x4",
@@ -108,7 +114,7 @@ class TestLeaveFlow(FrappeTestCase):
             self.assertEqual(response.status_code, 403)
             self.restore()
             user = frappe.get_doc("User", "eb-x4@integration.invalid")
-            user.enabled, user.api_key, user.api_secret = 0, None, None
+            user.enabled, user.api_key, user.api_secret = previous
             user.save()
             frappe.db.commit()
             return frappe.get_doc("Leave Application", name)
@@ -139,10 +145,12 @@ class TestLeaveFlow(FrappeTestCase):
         )
 
     def test_employee_and_x4_follow_two_stages(self):
-        for day, x4 in ((19, False), (20, True)):
+        for day, x4, hr in ((19, False, "hr"), (20, True, "hruser")):
+            self.restore()
+            self.employee.db_set("eb_hr_approver", self.users[hr])
             doc = self.new_leave(day, x4)
             self.assert_state(doc, "EB Leave Manager")
-            self.assertEqual(doc.eb_hr_approver, self.users["hr"])
+            self.assertEqual(doc.eb_hr_approver, self.users[hr])
             for label, action in (
                 ("staff", "EB Manager Approve"),
                 ("other", "EB Manager Approve"),
@@ -154,11 +162,15 @@ class TestLeaveFlow(FrappeTestCase):
             self.assert_state(doc, "EB Leave HR")
             with self.assertRaises(frappe.ValidationError):
                 self.action(doc, "other", "EB HR Approve")
-            doc = self.action(doc, "hr", "EB HR Approve")
+            doc = self.action(doc, hr, "EB HR Approve")
             self.assert_state(doc, "EB Leave Approved", "Approved", 1)
-        self.restore()
+        self.restore(hr)
         self.assertEqual(get_leave_balance_on(self.employee.name, self.leave_type, "2026-10-21"), 8)
-        doc = self.action(doc, "hr", "EB Cancel Leave")
+        forged = frappe.get_doc("Leave Application", doc.name)
+        forged.eb_leave_state = "EB Leave Cancelled"
+        with self.assertRaises(frappe.PermissionError):
+            forged.save()
+        doc = self.action(doc, hr, "EB Cancel Leave")
         self.assert_state(doc, "EB Leave Cancelled", "Cancelled", 2)
         self.restore()
         self.assertEqual(get_leave_balance_on(self.employee.name, self.leave_type, "2026-10-21"), 9)
@@ -199,14 +211,16 @@ class TestLeaveFlow(FrappeTestCase):
         with self.assertRaises(frappe.ValidationError):
             self.action(doc, "staff", "EB Manager Approve")
         self.restore()
-        frappe.db.set_value(
-            "Employee",
-            self.employee.name,
-            {"leave_approver": self.users["manager"], "eb_hr_approver": None},
-        )
-        doc = self.new_leave(20)
-        with self.assertRaises(frappe.ValidationError):
-            self.action(doc, "manager", "EB Manager Approve")
+        frappe.get_doc("User", self.users["staff"]).add_roles("HR User")
+        for hr in (None, self.users["staff"]):
+            frappe.db.set_value(
+                "Employee",
+                self.employee.name,
+                {"leave_approver": self.users["manager"], "eb_hr_approver": hr},
+            )
+            doc = self.new_leave(20 if hr is None else 21)
+            with self.assertRaises(frappe.ValidationError):
+                self.action(doc, "manager", "EB Manager Approve")
 
     def test_department_approver_fallback(self):
         department = frappe.get_doc(

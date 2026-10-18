@@ -25,6 +25,7 @@ def configure():
                 dict(
                     fieldname="eb_hr_approver",
                     label="请假 HR 审批人",
+                    insert_after="leave_approver",
                     fieldtype="Link",
                     options="User",
                 )
@@ -106,7 +107,7 @@ def validate(doc, method=None):
         if (
             not hr
             or not frappe.db.get_value("User", hr, "enabled")
-            or "HR Manager" not in frappe.get_roles(hr)
+            or not set(frappe.get_roles(hr)) & {"HR User", "HR Manager"}
             or hr == owner
         ):
             frappe.throw("请先由 HR Manager 在员工档案配置有效且非本人的 HR 审批人。")
