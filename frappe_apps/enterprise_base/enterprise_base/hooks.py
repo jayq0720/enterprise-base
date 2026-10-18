@@ -7,9 +7,10 @@ app_license = "GPL-3.0"
 required_apps = ["hrms", "wiki"]
 before_install = "enterprise_base.install.ensure_role"
 after_sync = ["enterprise_base.install.configure", "enterprise_base.integration.configure_webhooks"]
-after_sync.append("enterprise_base.onboarding.configure")
 after_migrate = [*after_sync, "enterprise_base.permissions.align_wiki_review_state"]
 after_install = ["enterprise_base.permissions.align_wiki_review_state"]
+after_sync.append("enterprise_base.onboarding.configure")
+after_migrate.append("enterprise_base.onboarding.configure")
 doc_events: dict[str, dict[str, str | list[str]]] = {
     doctype: {
         "validate": "enterprise_base.duties.validation.validate_scope_name",
