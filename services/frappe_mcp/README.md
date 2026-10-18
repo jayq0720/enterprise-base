@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | `leave_balance` | 各假期类型的总额、已休、审批中、剩余 | 只查自己 |
 | `my_leave_applications` | 最近的请假申请（编号、类型、起止日期、天数、状态） | 只查自己，不含已取消 |
-| `pending_my_approval` | 等我审批的请假申请，带申请人姓名 | 审批人是我、状态 Open |
+| `pending_my_approval` | 等我审批的请假申请，带申请人姓名 | 两级审批：停在主管环节且 `leave_approver` 是我，或已转到 HR 环节且 `eb_hr_approver` 是我；未提交 |
 | `my_responsibilities` | 自己的岗位名称和岗位职责（X1 在“岗位”上加的“岗位职责”，富文本转成纯文本，最多 3000 字） | 只查自己档案上的岗位 |
 | `draft_leave` | 请假草稿（类型、起止日期、事由、剩余天数）和签名的 `draft_token`；**不写 HR 系统** | 只给自己起草 |
 
