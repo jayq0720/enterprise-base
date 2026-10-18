@@ -23,7 +23,10 @@ class TestCardDelivery(FrappeTestCase):
                 delivery, "api", return_value=dict(response_code="synthetic-code")
             ) as send,
             patch.object(frappe, "logger") as logger,
+            patch.object(frappe.db, "commit", wraps=frappe.db.commit) as commit,
         ):
+            manager = employees["manager"]
+            manager.db_set("status", "Left")
             doc = frappe.get_doc(
                 {
                     "doctype": "Leave Application",
@@ -33,9 +36,29 @@ class TestCardDelivery(FrappeTestCase):
                     "eb_hr_approver": users["hr"],
                 }
             ).insert()
+            for field, value in (("status", "Active"), ("wecom_userid", manager.wecom_userid)):
+                self.assertEqual(frappe.db.count(delivery.DT, {"leave_application": doc.name}), 0)
+                if field == "status":
+                    frappe.db.set_value(
+                        "Employee", manager.name, {"status": value, "wecom_userid": None}
+                    )
+                else:
+                    manager.db_set(field, value)
+                delivery.on_update(doc)
             first = frappe.get_doc(delivery.DT, {"leave_application": doc.name})
             delivery.on_update(doc)
             self.assertEqual(frappe.db.count(delivery.DT, {"leave_application": doc.name}), 1)
+            manager.db_set("status", "Left")
+            delivery.process(first.name)
+            self.assertEqual(frappe.db.get_value(delivery.DT, first.name, "status"), "Expired")
+            send.assert_not_called()
+            self.assertIn("recipient-rejected", str(logger.mock_calls))
+            manager.db_set("status", "Active")
+            first.db_set("status", "Pending")
+            commit.reset_mock()
+            send.side_effect = lambda *_: (
+                self.assertTrue(commit.called) or dict(response_code="synthetic-code")
+            )
             delivery.process(first.name)
             first.reload()
             self.assertEqual(first.status, "Sent")

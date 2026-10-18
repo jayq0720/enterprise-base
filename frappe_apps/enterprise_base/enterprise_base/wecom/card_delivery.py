@@ -2,7 +2,6 @@
 
 import hashlib
 from datetime import UTC, datetime
-from urllib.parse import quote, urlsplit
 
 import frappe
 from frappe.utils import strip_html
@@ -24,10 +23,7 @@ def settings():
     cfg = frappe.conf.get("eb_wecom_cards")
     if not isinstance(cfg, dict) or cfg.get("enabled") is not True:
         return None
-    # 依赖底座尚未合入或未迁移时保持关闭，避免影响既有请假保存。
-    if not frappe.db.exists("DocType", DT):
-        return None
-    return cfg
+    return cfg if frappe.db.exists("DocType", DT) else None
 
 
 def api(path, body):
@@ -102,11 +98,6 @@ def on_update(doc, method=None):
 
 
 def locked(name):
-    leave = frappe.db.get_value(DT, name, "leave_application")
-    if not leave or not frappe.db.sql(
-        "select name from `tabLeave Application` where name=%s for update", leave
-    ):
-        return None
     if not frappe.db.sql("select name from `tabEB Approval Card` where name=%s for update", name):
         return None
     return frappe.get_doc(DT, name)
@@ -117,16 +108,6 @@ def cut(value, limit=128):
 
 
 def payload(doc, card, cfg):
-    url = urlsplit(str(cfg.get("desk_url") or ""))
-    if (
-        url.scheme != "https"
-        or not url.hostname
-        or url.username
-        or url.password
-        or url.query
-        or url.fragment
-    ):
-        raise ValueError("卡片后台地址配置无效。")
     fields = [
         ("申请人", doc.employee_name),
         ("假期类型", doc.leave_type),
@@ -143,10 +124,6 @@ def payload(doc, card, cfg):
             card_type="button_interaction",
             main_title=dict(title="请假审批", desc=cut(doc.name)),
             horizontal_content_list=[dict(keyname=k, value=cut(v)) for k, v in fields],
-            card_action=dict(
-                type=1,
-                url=url.geturl().rstrip("/") + "/app/leave-application/" + quote(doc.name, safe=""),
-            ),
             task_id=card.task_id,
             button_list=[
                 dict(text="通过", style=1, key="approve"),
@@ -160,18 +137,27 @@ def process(card):
     cfg = settings()
     if not cfg:
         return
+    lease = frappe.cache.lock("eb-card-delivery:" + card, timeout=90)
+    if not lease.acquire(blocking=False):
+        return
+    try:
+        dispatch(card, cfg)
+    finally:
+        lease.release()
+
+
+def dispatch(card, cfg):
     record = locked(card)
     if not record or record.status == "Expired" or record.attempts >= 3:
         return
     action = "update" if record.status == "Done" else "send"
-    if (
-        action == "send"
-        and record.status == "Sent"
-        or action == "update"
-        and record.update_status in {"Done", "Expired"}
+    if record.status == "Sent" or (
+        record.status == "Done" and record.update_status in {"Done", "Expired"}
     ):
         return
     record.attempts += 1
+    record.save(ignore_permissions=True)
+    frappe.db.commit()  # HTTP 之前释放所有数据库锁；Redis 只串行化发卡任务。
     try:
         doc = frappe.get_doc("Leave Application", record.leave_application)
         if action == "send":
@@ -207,18 +193,22 @@ def process(card):
                     ),
                 )
                 record.update_status, record.attempts = "Done", 0
-        record.save(ignore_permissions=True)
-        log(
-            record.leave_application,
-            action,
-            record.update_status if action == "update" else record.status,
-        )
     except Exception:
         record.update_status = "Failed"
         if action == "send":
             record.status = "Failed"
-        record.save(ignore_permissions=True)
-        log(record.leave_application, action, "failed")
+    latest = locked(card)
+    if latest.status == "Done" and action == "send":
+        if record.status == "Sent" and not latest.get_password(
+            "response_code", raise_exception=False
+        ):
+            latest.response_code, latest.sent_at = record.response_code, record.sent_at
+        record = latest  # 后台可能已审批，不能用过时的发送结果覆盖审批结果。
+        enqueue(card)
+    record.save(ignore_permissions=True)
+    result = record.update_status if action == "update" else record.status
+    log(record.leave_application, action, result)
+    frappe.db.commit()
 
 
 def retry():
