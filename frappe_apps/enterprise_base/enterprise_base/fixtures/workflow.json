@@ -248,8 +248,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null,
-        "idx": 1
+        "workflow_builder_id": null
       },
       {
         "action": "EB Return Leave",
@@ -262,8 +261,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null,
-        "idx": 2
+        "workflow_builder_id": null
       },
       {
         "action": "EB Reject Leave",
@@ -276,8 +274,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Manager",
-        "workflow_builder_id": null,
-        "idx": 3
+        "workflow_builder_id": null
       },
       {
         "action": "EB HR Approve",
@@ -290,8 +287,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 4
+        "workflow_builder_id": null
       },
       {
         "action": "EB Return Leave",
@@ -304,8 +300,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 5
+        "workflow_builder_id": null
       },
       {
         "action": "EB Reject Leave",
@@ -318,8 +313,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 6
+        "workflow_builder_id": null
       },
       {
         "action": "EB Resend Leave",
@@ -332,8 +326,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Returned",
-        "workflow_builder_id": null,
-        "idx": 7
+        "workflow_builder_id": null
       },
       {
         "action": "EB Cancel Leave",
@@ -346,8 +339,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Approved",
-        "workflow_builder_id": null,
-        "idx": 8
+        "workflow_builder_id": null
       },
       {
         "action": "EB HR Approve",
@@ -360,8 +352,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 9
+        "workflow_builder_id": null
       },
       {
         "action": "EB Return Leave",
@@ -374,8 +365,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 10
+        "workflow_builder_id": null
       },
       {
         "action": "EB Reject Leave",
@@ -388,8 +378,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave HR",
-        "workflow_builder_id": null,
-        "idx": 11
+        "workflow_builder_id": null
       },
       {
         "action": "EB Cancel Leave",
@@ -402,8 +391,7 @@
         "parenttype": "Workflow",
         "send_email_to_creator": 0,
         "state": "EB Leave Approved",
-        "workflow_builder_id": null,
-        "idx": 12
+        "workflow_builder_id": null
       }
     ],
     "workflow_data": null,
