@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, nowdate
 
 
 class TestOnboarding(FrappeTestCase):
@@ -20,7 +21,12 @@ class TestOnboarding(FrappeTestCase):
         self.suffix = frappe.generate_hash(length=8)
         self.hr = "boarding-hr-" + self.suffix + "@test.invalid"
         self.clerk = "boarding-clerk-" + self.suffix + "@test.invalid"
-        for email, roles in ((self.hr, ["HR Manager", "HR User"]), (self.clerk, ["HR User"])):
+        self.assignee = "boarding-task-" + self.suffix + "@test.invalid"
+        for email, roles in (
+            (self.hr, ["HR Manager", "HR User"]),
+            (self.clerk, ["HR User"]),
+            (self.assignee, ["Employee"]),
+        ):
             frappe.get_doc(
                 {**self.data["user"], "email": email, "roles": [{"role": r} for r in roles]}
             ).insert()
@@ -57,15 +63,16 @@ class TestOnboarding(FrappeTestCase):
         template.company, template.designation = "P2 Synthetic", self.designation
         for activity in template.activities:
             activity.user = self.hr
-        template.activities[-1].user = self.clerk
+        template.activities[-1].user = self.assignee
         self.template = template.insert()
 
-    def employee(self, applicant=True):
+    def employee(self, applicant=True, joining=None):
         return frappe.get_doc(
             {
                 **self.data["employee"],
                 "first_name": "Synthetic Boarding",
                 "employee_number": "BOARD-" + self.suffix,
+                "date_of_joining": joining or nowdate(),
                 "wecom_userid": None
                 if frappe.session.user == self.clerk
                 else "board-" + self.suffix,
@@ -107,8 +114,10 @@ class TestOnboarding(FrappeTestCase):
                     1,
                 )
             self.assertTrue(
-                frappe.has_permission(doc=frappe.get_doc("Task", tasks[-1]), user=self.clerk)
+                frappe.has_permission(doc=frappe.get_doc("Task", tasks[-1]), user=self.assignee)
             )
+            for target in (onboarding, self.offer, employee):
+                self.assertFalse(frappe.has_permission(doc=target, user=self.assignee))
             frappe.set_user("Administrator")
             unrelated = frappe.get_doc(
                 dict(doctype="Task", subject="Unrelated synthetic task")
@@ -167,6 +176,33 @@ class TestOnboarding(FrappeTestCase):
         employee = self.employee()
         self.assertFalse(frappe.db.exists("Employee Onboarding", {"employee": employee.name}))
         frappe.set_user(self.hr)
+        employee.save()
+        self.assertTrue(
+            frappe.db.exists("Employee Onboarding", {"employee": employee.name, "docstatus": 1})
+        )
+
+    def test_old_employee_is_not_auto_onboarded(self):
+        employee = self.employee(joining=add_days(nowdate(), -40))
+        employee.save()
+        self.assertFalse(frappe.db.exists("Employee Onboarding", {"employee": employee.name}))
+
+    def test_submit_failure_preserves_employee_and_rolls_back_onboarding(self):
+        from hrms.hr.doctype.employee_onboarding.employee_onboarding import EmployeeOnboarding
+
+        counts = [frappe.db.count(dt) for dt in ("Employee Onboarding", "Project", "Task", "ToDo")]
+        submit = EmployeeOnboarding.submit
+
+        def fail_after_native_submit(doc):
+            submit(doc)
+            raise frappe.ValidationError("synthetic-private-error")
+
+        with patch.object(EmployeeOnboarding, "submit", fail_after_native_submit):
+            employee = self.employee()
+        self.assertTrue(frappe.db.exists("Employee", employee.name))
+        self.assertEqual(
+            counts,
+            [frappe.db.count(dt) for dt in ("Employee Onboarding", "Project", "Task", "ToDo")],
+        )
         employee.save()
         self.assertTrue(
             frappe.db.exists("Employee Onboarding", {"employee": employee.name, "docstatus": 1})

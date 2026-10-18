@@ -2,6 +2,7 @@
 
 import frappe
 from frappe.permissions import add_permission, setup_custom_perms, update_permission_property
+from frappe.utils import add_days, getdate
 from hrms.controllers.employee_boarding_controller import get_onboarding_details
 
 
@@ -30,6 +31,11 @@ def configure():
 
 def generate(doc, method=None):
     if doc.status != "Active" or not doc.designation:
+        return
+    window = frappe.conf.get("eb_onboarding_window_days", 30)
+    if not isinstance(window, int) or not 1 <= window <= 365:
+        return pending("请管理员将入职自动生成天数配置为 1 至 365 的整数。")
+    if doc.date_of_joining and getdate(doc.date_of_joining) < add_days(getdate(), -window):
         return
     templates = frappe.get_all(
         "Employee Onboarding Template",
@@ -98,8 +104,15 @@ def generate(doc, method=None):
             activities=activities,
         )
     )
-    onboarding.insert()
-    onboarding.submit()
+    messages = list(getattr(frappe.local, "message_log", []) or [])
+    frappe.db.savepoint("eb_onboarding")
+    try:
+        onboarding.insert()
+        onboarding.submit()
+    except Exception:
+        frappe.db.rollback(save_point="eb_onboarding")
+        frappe.local.message_log = messages
+        pending("入职单未生成，请 HR 核对假日表和招聘配置后保存员工档案重试。")
 
 
 def pending(message):
