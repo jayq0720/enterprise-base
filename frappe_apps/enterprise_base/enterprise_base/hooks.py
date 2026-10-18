@@ -43,7 +43,6 @@ permission_query_conditions = {"Employee": "enterprise_base.permissions.employee
 doc_events["Employee"] = {"on_update": "enterprise_base.permissions.disable_left_user"}
 doc_events["Wiki Document"] = {"before_validate": "enterprise_base.permissions.wiki_review"}
 doc_events["Leave Application"] = {"before_validate": "enterprise_base.permissions.x4_draft"}
-doc_events["Leave Application"]["on_update"] = "enterprise_base.wecom.card_delivery.on_update"
 doc_events["Version"] = {"before_insert": "enterprise_base.permissions.redact_version"}
 doc_events["User"] = {"on_update": "enterprise_base.permissions.hr_scope"}
 fixtures.extend(
@@ -72,6 +71,8 @@ fixtures.extend(
     {"dt": dt, "filters": [["name", "like", "EB %"]]}
     for dt in ("Workflow", "Workflow State", "Workflow Action Master")
 )
+
+doc_events["Leave Application"]["on_update"] = "enterprise_base.wecom.card_delivery.on_update"
 
 persistent_cache_keys = ["eb-org-import"]
 scheduler_events = {"hourly": ["enterprise_base.wecom.sync.hourly"]}
