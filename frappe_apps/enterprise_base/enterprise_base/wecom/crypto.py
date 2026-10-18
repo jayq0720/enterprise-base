@@ -9,6 +9,7 @@ import secrets
 import struct
 import time
 from xml.etree import ElementTree as ET
+from xml.parsers import expat
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -22,15 +23,22 @@ class InvalidCallback(ValueError):
 
 
 def xml_fields(body: bytes) -> dict[str, str]:
-    if (
-        not body
-        or len(body) > LIMIT
-        or b"\x00" in body
-        or b"<!" in body.upper().replace(b"<![CDATA[", b"")
-    ):
+    if not body or len(body) > LIMIT or b"\x00" in body:
         raise InvalidCallback()
     try:
-        root = ET.fromstring(body)
+        builder, parser = ET.TreeBuilder(), expat.ParserCreate()
+        parser.StartElementHandler = builder.start
+        parser.EndElementHandler = builder.end
+        parser.CharacterDataHandler = builder.data
+
+        def reject(*_args):
+            raise InvalidCallback()
+
+        parser.StartDoctypeDeclHandler = reject
+        parser.EntityDeclHandler = reject
+        parser.ExternalEntityRefHandler = reject
+        parser.Parse(body, True)
+        root = builder.close()
         if root.tag != "xml" or root.attrib or len(root) > 32:
             raise InvalidCallback()
         fields = {}
@@ -39,7 +47,7 @@ def xml_fields(body: bytes) -> dict[str, str]:
                 raise InvalidCallback()
             fields[node.tag] = node.text or "" if not len(node) else ""
         return fields
-    except ET.ParseError:
+    except (ET.ParseError, expat.ExpatError):
         raise InvalidCallback() from None
 
 

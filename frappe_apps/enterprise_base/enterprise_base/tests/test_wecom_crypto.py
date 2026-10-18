@@ -56,6 +56,8 @@ class TestWecomCrypto(TestCase):
             b"<xml a='x'/>",
             b"<xml><x>1</x><x>2</x></xml>",
             b"<!DOCTYPE xml [<!ENTITY a 'secret'>]><xml>&a;</xml>",
+            b'<!DOCTYPE xml SYSTEM "https://synthetic.invalid/a"><xml/>',
+            b'<!DOCTYPE xml [<!ENTITY % x SYSTEM "file:///synthetic">%x;]><xml/>',
             b"<xml>\x00</xml>",
             b"<xml>",
         ):
@@ -65,6 +67,9 @@ class TestWecomCrypto(TestCase):
             xml_fields(b"<xml><Content><![CDATA[synthetic]]></Content></xml>")["Content"],
             "synthetic",
         )
+        for content in ("look <!-- here", "<!DOCTYPE html>", "<html>&text</html>"):
+            raw = ("<xml><Content><![CDATA[" + content + "]]></Content></xml>").encode()
+            self.assertEqual(xml_fields(raw)["Content"], content)
 
     def test_response_randomization(self):
         message = self.vector["plaintext"].encode()
