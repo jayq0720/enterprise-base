@@ -76,8 +76,11 @@ class TestCardDelivery(FrappeTestCase):
             )
             frappe.enqueue.reset_mock()
             delivery.retry()
+            # 其他测试（如卡片动作）提交过的卡片也会被补偿任务捞到，只核对本单的两张
+            ours = set(frappe.get_all(delivery.DT, {"leave_application": doc.name}, pluck="name"))
             self.assertEqual(
-                {c.kwargs["card"] for c in frappe.enqueue.call_args_list}, {first.name, second.name}
+                {c.kwargs["card"] for c in frappe.enqueue.call_args_list} & ours,
+                {first.name, second.name},
             )
             delivery.process(first.name)
             first.reload()
