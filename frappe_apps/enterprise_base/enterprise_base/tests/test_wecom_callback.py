@@ -1,4 +1,4 @@
-"""真实 HTTP 分流/拒绝；协议与动作接口用替代对象，非企业微信联测。"""
+"""真实 HTTP 与签名回归；桥接/动作含替代对象，非企业微信联测。"""
 
 import base64
 import time
@@ -11,7 +11,7 @@ from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
-from enterprise_base.wecom import callback
+from enterprise_base.wecom import callback, crypto
 
 
 class TestWecomCallback(FrappeTestCase):
@@ -118,13 +118,9 @@ class TestWecomCallback(FrappeTestCase):
         frappe.set_user("Administrator")
 
     def test_real_signature_http(self):
-        try:
-            crypto = callback.protocol()
-        except ImportError:
-            self.skipTest("须先合并 #53；跳过不计作真实签名 HTTP 验收。")
+        self.assertIs(callback.protocol(), crypto)
         site = frappe.local.site
         cfg = dict(
-            enabled=True,
             corpid="synthetic-corp",
             agentid="1001",
             token="synthetic-token",
@@ -133,7 +129,7 @@ class TestWecomCallback(FrappeTestCase):
         original_guard = callback.guard
 
         def guard():
-            frappe.conf.eb_wecom_cards = cfg
+            frappe.conf.eb_wecom_cards = dict(cfg, enabled=True)
             original_guard()
 
         client = Client(application, Response, use_cookies=False)
@@ -186,6 +182,7 @@ class TestWecomCallback(FrappeTestCase):
             ):
                 self.assertEqual(request(message, **changes).status_code, 403)
             self.assertEqual(forward.call_count, 1)
+        print("test_real_signature_http：GET/POST、签名时效/CorpID/CDATA及越权拒绝通过。")
         if not getattr(frappe.local, "db", None):
             frappe.init(site=site)
             frappe.connect()

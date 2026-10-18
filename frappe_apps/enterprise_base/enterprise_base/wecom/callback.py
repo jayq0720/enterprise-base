@@ -45,7 +45,7 @@ def validate_request():
 
 
 def protocol():
-    from enterprise_base.wecom import crypto  # type: ignore[attr-defined]
+    from enterprise_base.wecom import crypto
 
     return crypto
 
