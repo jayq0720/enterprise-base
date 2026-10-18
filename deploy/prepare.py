@@ -72,6 +72,9 @@ if mode == "init":
     print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖密钥。")
     sys.exit()
 settings = env(sys.argv[2] if mode in {"check", "wechat", "policy-sync", "hr-assistant"} else mode)
+callback_mode = settings.get("EB_WECOM_CALLBACK_MODE", "bridge")
+if callback_mode not in {"bridge", "approvals"} or (callback_mode == "approvals" and settings.get("EB_SCHEME") != "https"):
+    sys.exit("企业微信回调模式仅允许 bridge 或 approvals；approvals 必须使用 HTTPS。")
 try:
     admin_ranges = [ipaddress.ip_network(value) for value in settings.get("EB_ADMIN_ALLOW_CIDRS", "127.0.0.1/32").split()]
     if not admin_ranges or any(network.prefixlen == 0 for network in admin_ranges):
@@ -114,6 +117,17 @@ if settings["EB_SCHEME"] not in {"http", "https"}:
 Path("secrets").mkdir(exist_ok=True, mode=0o700)
 Path("data").mkdir(exist_ok=True)
 caddyfile = Path("Caddyfile").read_text()
+if callback_mode == "approvals":
+    caddyfile = caddyfile.replace("        reverse_proxy wechat:9898", """        request_body {
+            max_size 65536
+        }
+        rewrite * /api/method/enterprise_base.wecom.callback.receive
+        reverse_proxy frappe:8080 {
+            header_up Host hr.""" + settings["EB_DOMAIN"] + """
+            header_up -Cookie
+            header_up -Authorization
+            header_up -X-Frappe-Site-Name
+        }""")
 # 仅精确绑定 IPv4 回环时由宿主机端口隔离；其它绑定保持来源限制。
 if (settings.get("EB_BIND") or "127.0.0.1") == "127.0.0.1":
     caddyfile = caddyfile.replace("        import admin_only\n", "")
@@ -171,6 +185,9 @@ hr["name"] = f"{project}-hr"
 for svc in hr["services"].values():
     svc["image"], svc["pull_policy"] = LOCK["frappe_image"], "never"
 hr["services"].update(yaml.safe_load(Path("frappe-services.yaml").read_text())["services"])
+if callback_mode == "approvals":
+    # 官方 Nginx 默认记录完整查询串；不持久化 GET 验证密文和签名。
+    hr["services"]["frontend"]["logging"] = {"driver": "none"}
 hr["networks"] = {"default": {}, "edge": edge}
 hr["volumes"].update({"db": {}, "cache": {}, "queue": {}, "logs": {}})
 for svc in hr["services"].values():

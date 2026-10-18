@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import http.client
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import ipaddress
 import json
@@ -12,6 +13,7 @@ import socket
 import subprocess
 import tarfile
 import time
+import threading
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -54,7 +56,17 @@ def flatten(routes):
             yield route
 
 
-def check_routes(config, environment, bind):
+def nodes(value):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from nodes(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from nodes(child)
+
+
+def check_routes(config, environment, bind, callback_mode="bridge"):
     routes = [r for s in config["apps"]["http"]["servers"].values() for r in s["routes"]]
     for key, upstream in (("DIFY_ADDRESS", "dify:80"), ("HR_ADDRESS", "frappe:8080")):
         host = urlsplit(environment[key]).hostname
@@ -69,15 +81,41 @@ def check_routes(config, environment, bind):
         proxy = chain[-1]
         need(not proxy.get("match") and proxy["handle"][0]["handler"] == "reverse_proxy")
         need(proxy["handle"][0]["upstreams"] == [{"dial": upstream}])
+    host = urlsplit(environment["WECOM_ADDRESS"]).hostname
+    sites = [r for r in routes if r.get("match") == [{"host": [host]}]]
+    need(len(sites) == 1)
+    parts = list(nodes(sites[0]))
+    need([n["path"] for n in parts if "path" in n] == [["/wxcomapp"]])
+    proxies = [n for n in parts if n.get("handler") == "reverse_proxy"]
+    need(len(proxies) == 1 and proxies[0]["upstreams"] == [{"dial": "frappe:8080" if callback_mode == "approvals" else "wechat:9898"}])
+    if callback_mode == "approvals":
+        need([n.get("uri") for n in parts if n.get("handler") == "rewrite"] == ["/api/method/enterprise_base.wecom.callback.receive"])
+        need([n.get("max_size") for n in parts if n.get("handler") == "request_body"] == [65536])
+        need(proxies[0]["headers"]["request"] == {"delete": ["Cookie", "Authorization", "X-Frappe-Site-Name"],
+             "set": {"Host": [urlsplit(environment["HR_ADDRESS"]).hostname]}})
+    else:
+        need(not any(n.get("handler") == "rewrite" for n in parts))
     return routes
 
 
-def probe(binary, routes, environment, work, bind):
+def probe(binary, routes, environment, work, bind, callback_mode="bridge"):
+    class Backend(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps({"path": self.path, "headers": dict(self.headers)}).encode())
+
+        def log_message(self, *_args):
+            pass
+
+    backend = ThreadingHTTPServer(("127.0.0.1", 0), Backend)
+    worker = threading.Thread(target=backend.serve_forever, daemon=True)
+    worker.start()
+
     def replace_backend(node):
         if isinstance(node, dict):
             if node.get("handler") == "reverse_proxy":
-                node.clear()
-                node.update(handler="static_response", status_code=200, body="test-backend")
+                node["upstreams"] = [{"dial": f"127.0.0.1:{backend.server_port}"}]
             for value in node.values():
                 replace_backend(value)
         elif isinstance(node, list):
@@ -97,17 +135,18 @@ def probe(binary, routes, environment, work, bind):
     process = subprocess.Popen([binary, "run", "--config", str(path)], stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL, env={**os.environ,
                                "XDG_CONFIG_HOME": str(work / "caddy-config"), "XDG_DATA_HOME": str(work / "caddy-data")})
-    def status(host, path, forged=False):
+    def status(host, path, forged=False, detail=False):
         connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
         try:
             headers = {"Host": host}
             if forged:
                 headers.update({"X-Forwarded-For": "203.0.113.42", "X-Real-IP": "203.0.113.42",
-                                "Forwarded": "for=203.0.113.42"})
+                                "Forwarded": "for=203.0.113.42", "Cookie": "sid=synthetic",
+                                "Authorization": "token synthetic", "X-Frappe-Site-Name": "forged.invalid"})
             connection.request("GET", path, headers=headers)
             response = connection.getresponse()
-            response.read()
-            return response.status
+            body = response.read()
+            return json.loads(body) if detail else response.status
         finally:
             connection.close()
     try:
@@ -131,6 +170,15 @@ def probe(binary, routes, environment, work, bind):
                     need(status(urlsplit(environment[key]).hostname, route, forged) == (200 if allowed else 403))
         host = urlsplit(environment["WECOM_ADDRESS"]).hostname
         need(status(host, "/wxcomapp") == 200 and status(host, "/not-a-callback") == 404)
+        for path in ("/wxcomapp/", "/wxcomapp-extra", "/login", "/api/resource/Employee", "/api/method/frappe.auth.get_logged_user"):
+            need(status(host, path) == 404)
+        query = "?msg_signature=synthetic&timestamp=1&nonce=synthetic&echostr=synthetic"
+        received = status(host, "/wxcomapp" + query, forged=True, detail=True)
+        expected = "/api/method/enterprise_base.wecom.callback.receive" if callback_mode == "approvals" else "/wxcomapp"
+        need(received["path"] == expected + query)
+        if callback_mode == "approvals":
+            need(received["headers"]["Host"] == urlsplit(environment["HR_ADDRESS"]).hostname)
+            need(not {"cookie", "authorization", "x-frappe-site-name"} & {k.lower() for k in received["headers"]})
     finally:
         process.terminate()
         try:
@@ -138,9 +186,12 @@ def probe(binary, routes, environment, work, bind):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        backend.shutdown()
+        backend.server_close()
+        worker.join(timeout=2)
 
 
-def verify_access(work, environment, bind, text=None, run_probe=True):
+def verify_access(work, environment, bind, text=None, run_probe=True, callback_mode="bridge"):
     binary = binary_for(work)
     path = work / "caddy-adapt.Caddyfile"
     path.write_text((work / "data/Caddyfile").read_text() if text is None else text)
@@ -148,6 +199,6 @@ def verify_access(work, environment, bind, text=None, run_probe=True):
                             env={**os.environ, **environment}, capture_output=True, text=True)
     need(result.returncode == 0)
     config = json.loads(result.stdout)
-    routes = check_routes(config, environment, bind)
+    routes = check_routes(config, environment, bind, callback_mode)
     if run_probe:
-        probe(binary, routes, environment, work, bind)
+        probe(binary, routes, environment, work, bind, callback_mode)

@@ -15,7 +15,7 @@
     }
 }
 {$WECOM_ADDRESS} {
-    handle /wxcomapp* {
+    handle /wxcomapp {
         reverse_proxy wechat:9898
     }
     respond 404

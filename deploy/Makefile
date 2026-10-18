@@ -6,7 +6,7 @@ RUN = $(PYTHON) prepare.py
 EDGE = $(DOCKER) compose --env-file $(ENV) -f docker-compose.yml
 DIFY = $(DOCKER) compose --env-file secrets/dify.env -f data/dify/docker/eb-compose.yaml
 HR = $(DOCKER) compose --env-file $(ENV) -f data/frappe/eb-compose.yaml
-.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant
+.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant wecom-cards
 init:
 	$(RUN) init
 prepare:
@@ -30,6 +30,10 @@ up: config
 wechat: prepare
 	$(RUN) wechat $(ENV)
 	$(EDGE) --profile wechat up -d wechat
+wecom-cards: wechat
+	$(PYTHON) wecom_cards.py $(ENV)
+	$(HR) up -d --force-recreate frontend backend queue-short queue-long scheduler
+	$(EDGE) up -d --force-recreate caddy
 status:
 	$(EDGE) --profile wechat ps
 	$(DIFY) ps
