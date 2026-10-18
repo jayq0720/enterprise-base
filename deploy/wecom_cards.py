@@ -141,7 +141,7 @@ def main():
         print("已应用企业微信卡片私有配置；仍须重启服务并做联测。")
     except (OSError, ValueError, KeyError, IndexError):
         sys.exit(
-            "卡片配置未完成；检查私有文件权限/必填值、前置 PR、迁移及服务状态。原始输出已隐藏。"
+            "企业微信部署检查未通过（含 bridge）；检查私有文件600权限/重复键、模式必填值、前置PR及服务。原始输出已隐藏。"
         )
 
 
