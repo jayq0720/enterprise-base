@@ -93,5 +93,8 @@ fixtures.extend(
     for dt in ("Workflow", "Workflow State", "Workflow Action Master")
 )
 
+doc_events["Leave Application"]["on_update"] = "enterprise_base.wecom.card_delivery.on_update"
+
 persistent_cache_keys = ["eb-org-import"]
 scheduler_events = {"hourly": ["enterprise_base.wecom.sync.hourly"]}
+scheduler_events["hourly"].append("enterprise_base.wecom.card_delivery.retry")
