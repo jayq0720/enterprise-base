@@ -13,22 +13,18 @@ def configure():
         frappe.get_doc(data["schema"]).insert()
     create_custom_fields(
         {
-            "Employee": [
-                dict(fieldname="eb_hr_approver", label="HR", fieldtype="Link", options="User")
-            ],
-            "Leave Application": [
-                dict(fieldname="eb_hr_approver", label="HR", fieldtype="Link", options="User")
-            ],
+            dt: [dict(fieldname="eb_hr_approver", label="HR", fieldtype="Link", options="User")]
+            for dt in ("Employee", "Leave Application")
         }
     )
     flow = data["flow"]
-    for dt, key, rows in (
-        ("Workflow State", "state", flow["states"]),
-        ("Workflow Action Master", "action", flow["transitions"]),
+    for dt, key, field, rows in (
+        ("Workflow State", "state", "workflow_state_name", flow["states"]),
+        ("Workflow Action Master", "action", "workflow_action_name", flow["transitions"]),
     ):
         for value in {r[key] for r in rows}:
             if not frappe.db.exists(dt, value):
-                frappe.get_doc(dict(doctype=dt, **{key: value})).insert()
+                frappe.get_doc(dict(doctype=dt, **{field: value})).insert()
     if not frappe.db.exists("Workflow", flow["name"]):
         frappe.get_doc(flow).insert()
 
@@ -40,11 +36,7 @@ def records():
         if not frappe.db.exists(row["doctype"], row.get("name")):
             frappe.get_doc(row).insert()
     tag, users = frappe.generate_hash(length=8), {}
-    for label, roles in {
-        "staff": ["Employee"],
-        "manager": ["Employee", "Leave Approver"],
-        "hr": ["Employee", "HR Manager"],
-    }.items():
+    for label, roles in data["users"].items():
         email = f"card-{label}-{tag}@test.invalid"
         frappe.get_doc(
             {**data["user"], "email": email, "roles": [dict(role=r) for r in roles]}
