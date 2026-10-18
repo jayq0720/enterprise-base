@@ -1,0 +1,57 @@
+[
+  {
+    "activities": [
+      {
+        "activity_name": "合成示例：开通账号",
+        "begin_on": 0,
+        "description": null,
+        "duration": 1,
+        "parent": "EB Synthetic Onboarding",
+        "parentfield": "activities",
+        "parenttype": "Employee Onboarding Template",
+        "required_for_employee_creation": 0,
+        "role": null,
+        "task": null,
+        "task_weight": 0.0,
+        "user": null
+      },
+      {
+        "activity_name": "合成示例：领取设备",
+        "begin_on": 0,
+        "description": null,
+        "duration": 1,
+        "parent": "EB Synthetic Onboarding",
+        "parentfield": "activities",
+        "parenttype": "Employee Onboarding Template",
+        "required_for_employee_creation": 0,
+        "role": null,
+        "task": null,
+        "task_weight": 0.0,
+        "user": null
+      },
+      {
+        "activity_name": "合成示例：制度学习",
+        "begin_on": 1,
+        "description": null,
+        "duration": 1,
+        "parent": "EB Synthetic Onboarding",
+        "parentfield": "activities",
+        "parenttype": "Employee Onboarding Template",
+        "required_for_employee_creation": 0,
+        "role": null,
+        "task": null,
+        "task_weight": 0.0,
+        "user": null
+      }
+    ],
+    "company": null,
+    "department": null,
+    "designation": null,
+    "docstatus": 0,
+    "doctype": "Employee Onboarding Template",
+    "employee_grade": null,
+    "modified": "2026-10-18 07:06:56.620688",
+    "name": "EB Synthetic Onboarding",
+    "title": "EB Synthetic Onboarding"
+  }
+]
