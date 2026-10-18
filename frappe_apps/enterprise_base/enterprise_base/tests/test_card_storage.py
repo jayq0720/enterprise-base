@@ -21,6 +21,7 @@ class TestCardStorage(FrappeTestCase):
                 stage="EB Leave Manager",
                 recipient="Administrator",
                 userid="synthetic",
+                sent_at="2026-10-18T00:00:00+00:00",
             )
         )
         doc.response_code = secret
@@ -28,6 +29,8 @@ class TestCardStorage(FrappeTestCase):
         self.assertNotIn(secret, str(frappe.db.get_value(doc.doctype, doc.name, "*", as_dict=True)))
         doc.reload()
         self.assertEqual(doc.get_password("response_code"), secret)
+        self.assertEqual(doc.sent_at, "2026-10-18T00:00:00+00:00")
+        self.assertEqual(doc.update_status, "Pending")
         self.assertFalse(frappe.has_permission(doc=doc, user="Guest"))
         self.assertFalse(frappe.has_permission(doc=doc, user="eb-x4@integration.invalid"))
 
