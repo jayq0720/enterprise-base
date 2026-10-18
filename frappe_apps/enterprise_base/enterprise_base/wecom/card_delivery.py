@@ -223,13 +223,14 @@ def process(card):
 
 def retry():
     if settings():
+        pending = ["in", ["Pending", "Failed"]]
         names = set(
-            frappe.get_all(DT, filters={"status": "Failed", "attempts": ["<", 3]}, pluck="name")
+            frappe.get_all(DT, filters={"status": pending, "attempts": ["<", 3]}, pluck="name")
         )
         names.update(
             frappe.get_all(
                 DT,
-                filters={"status": "Done", "update_status": "Failed", "attempts": ["<", 3]},
+                filters={"status": "Done", "update_status": pending, "attempts": ["<", 3]},
                 pluck="name",
             )
         )

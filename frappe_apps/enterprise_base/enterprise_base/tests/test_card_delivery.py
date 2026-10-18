@@ -48,13 +48,18 @@ class TestCardDelivery(FrappeTestCase):
             doc = apply_workflow(doc.as_json(), "EB Manager Approve")
             first.reload()
             self.assertEqual((first.status, first.handled_by), ("Done", users["manager"]))
+            second = frappe.get_doc(
+                delivery.DT, {"leave_application": doc.name, "stage": "EB Leave HR"}
+            )
+            frappe.enqueue.reset_mock()
+            delivery.retry()
+            self.assertEqual(
+                {c.kwargs["card"] for c in frappe.enqueue.call_args_list}, {first.name, second.name}
+            )
             delivery.process(first.name)
             first.reload()
             self.assertEqual(first.update_status, "Done")
             self.assertEqual(send.call_args.args[0], "message/update_template_card")
-            second = frappe.get_doc(
-                delivery.DT, {"leave_application": doc.name, "stage": "EB Leave HR"}
-            )
             send.side_effect = ValueError("synthetic-private-error")
             delivery.process(second.name)
             second.reload()
