@@ -1,0 +1,83 @@
+[
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.696925",
+    "name": "EB Draft",
+    "style": "",
+    "workflow_state_name": "EB Draft"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.697787",
+    "name": "EB Review",
+    "style": "",
+    "workflow_state_name": "EB Review"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": "",
+    "modified": "2026-10-16 13:15:01.698613",
+    "name": "EB Published",
+    "style": "",
+    "workflow_state_name": "EB Published"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.728962",
+    "name": "EB Leave Manager",
+    "style": null,
+    "workflow_state_name": "EB Leave Manager"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.730296",
+    "name": "EB Leave HR",
+    "style": null,
+    "workflow_state_name": "EB Leave HR"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.731629",
+    "name": "EB Leave Returned",
+    "style": null,
+    "workflow_state_name": "EB Leave Returned"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.732980",
+    "name": "EB Leave Approved",
+    "style": null,
+    "workflow_state_name": "EB Leave Approved"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.734306",
+    "name": "EB Leave Rejected",
+    "style": null,
+    "workflow_state_name": "EB Leave Rejected"
+  },
+  {
+    "docstatus": 0,
+    "doctype": "Workflow State",
+    "icon": null,
+    "modified": "2026-10-18 05:04:53.735621",
+    "name": "EB Leave Cancelled",
+    "style": null,
+    "workflow_state_name": "EB Leave Cancelled"
+  }
+]
