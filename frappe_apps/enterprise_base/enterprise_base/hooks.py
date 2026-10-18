@@ -1,3 +1,5 @@
+before_request = ["enterprise_base.wecom.callback.guard"]
+
 app_name = "enterprise_base"
 app_title = "Enterprise Base"
 app_publisher = "Enterprise Base contributors"
