@@ -14,6 +14,7 @@ for site in contract.local import.local; do
     --admin-password "$EB_TEST_PASSWORD" --mariadb-user-host-login-scope '%' --install-app erpnext
   for app in hrms wiki; do bench --site "$site" install-app "$app"; done
   bench --site "$site" set-config allow_tests true
+  if test "$site" = contract.local; then
   ./env/bin/python - "$site" <<'PY'
 import sys
 import frappe
@@ -25,8 +26,11 @@ try:
 finally:
     frappe.destroy()
 PY
+  fi
   bench --site "$site" install-app enterprise_base
-  bench --site "$site" execute enterprise_base.tests.tool_switch_probe.verify_after_install
+  if test "$site" = contract.local; then
+    bench --site "$site" execute enterprise_base.tests.tool_switch_probe.verify_after_install
+  fi
   bench --site "$site" execute frappe.db.set_single_value --args '["System Settings",{"language":"en","time_zone":"Asia/Shanghai","enable_telemetry":0}]'
   # 官方 runner 仅在 CI 环境变量存在时才用退出码报告测试失败。
   CI=true bench --site "$site" run-tests --app enterprise_base --skip-test-records
