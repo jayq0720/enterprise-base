@@ -20,7 +20,7 @@
 | enterprise_base（X1） | 0.1.0；安装于原固定组合，Frappe 镜像后缀 `-eb0.1.0` | 本仓库 Frappe App，GPL-3.0-only；不修改上游源码 |
 | policy-sync（X5） | `sha256:7753056cf4f92798f6a96ab4815e616ef4cebda2cc9517e52b800da9fd2f876f`；[CI 发布记录](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38867670892)（main 4a1e1ff 构建） | 本仓库独立服务；运行依赖许可证由 CI 检查，不声明第三方授权 |
 | kb-gateway（X3） | `ghcr.io/qianjie0720-sys/enterprise-base-kb-gateway@sha256:41a8cd2a00c5f24c6fdbf0f5c3b6dead8eb880bf6c4e197d1663a7c88ef02d9b` | 本仓库独立服务；运行依赖许可证由 CI 检查，未新增依赖；[main 1f13089 发布产物](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38879664692) |
-| frappe-mcp（X4） | `ghcr.io/qianjie0720-sys/enterprise-base-frappe-mcp@sha256:ca1897fb7f8b8ae271583a429e33a7395e639077712c80c7d52c692468ea97f0` | 本仓库独立服务；运行依赖许可证由 CI 检查，未新增依赖；[main 1f13089 发布产物](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38879664692) |
+| frappe-mcp（X4） | `ghcr.io/qianjie0720-sys/enterprise-base-frappe-mcp@sha256:220cf801a18193cb40b5e1d0072e809c791db8b20e608eb850d9738c51082059` | 本仓库独立服务；运行依赖许可证由 CI 检查，未新增依赖；含 P2-C2 岗位开关及缺岗位/缺值拒绝；[main bb82cca 发布产物](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/39188132593) |
 | X3/X4/X5 构建 Python / uv 镜像 | 3.12.12-slim-bookworm / 0.11.32 | PSF / MIT 或 Apache-2.0；仅官方 Python、Astral 镜像 |
 
 实际启动的 Dify 服务全部保留上游命令、依赖条件、健康检查及隔离网络；仅裁掉未选数据库/向量库与 certbot，覆盖镜像版本、命名卷、环境变量和入口网络。只暴露 Caddy，插件调试、数据库、Qdrant 端口不发布。Dify Marketplace 仍需联网手动安装国产插件；关闭 Next.js 遥测、更新检查、Sentry/Amplitude，不将这些设置描述为完整的出口封锁。
