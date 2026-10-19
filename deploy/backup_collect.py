@@ -235,11 +235,8 @@ class Collector:
                 ["cp", self.containers["-hr", "backend"]["Id"] + ":" + work + "/.", "-"],
             )
         finally:
-            self.reader(
-                "-hr",
-                "backend",
-                ["-c", "import shutil;shutil.rmtree(" + repr(work) + ",ignore_errors=True)"],
-            )
+            cleanup = f"import os,shutil;p={work!r};os.path.exists(p) and shutil.rmtree(p)"
+            self.reader("-hr", "backend", ["-c", cleanup])
 
     def postgres(self, folder):
         container = self.containers["-dify", "db_postgres"]["Id"]
