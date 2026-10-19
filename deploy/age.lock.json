@@ -1,0 +1,42 @@
+{
+  "version": "1.2.1",
+  "license": "BSD-3-Clause",
+  "platforms": {
+    "darwin-arm64": {
+      "url": "https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-darwin-arm64.tar.gz",
+      "sha256": "cf79875bd5970dc2dac60c87fa50cee1ff1f9a41b0eb273f65e174aff37c367a",
+      "files": [
+        {
+          "path": "age",
+          "sha256": "d2b0d4211fd9e364ea8dd1cb150653a7f21dfc08e96632de444aa209db5fc0d0"
+        },
+        {
+          "path": "age-keygen",
+          "sha256": "5a08b29d04f20d58773309c2dd7c6192a81abeba42436d89eb7672ef5d598a04"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "32cc8df32709c059f3ee312dc088bae7ddb8b8adc1efdd2b6394cdcb8b6300c8"
+        }
+      ]
+    },
+    "linux-amd64": {
+      "url": "https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-linux-amd64.tar.gz",
+      "sha256": "7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50",
+      "files": [
+        {
+          "path": "age",
+          "sha256": "aaec874ed903da4b02a9d503778ae05ee5005b2acc0f4a4cf10e5d0f17fd4384"
+        },
+        {
+          "path": "age-keygen",
+          "sha256": "50f849de5f05dc136de3dba623dd2b7e166e7badb9d4e3d83da88f2dbdb2d439"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "32cc8df32709c059f3ee312dc088bae7ddb8b8adc1efdd2b6394cdcb8b6300c8"
+        }
+      ]
+    }
+  }
+}
