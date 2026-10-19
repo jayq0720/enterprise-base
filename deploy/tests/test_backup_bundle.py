@@ -2,6 +2,7 @@
 
 import io
 import json
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -145,3 +146,38 @@ class BundleTests(unittest.TestCase):
             ):
                 with self.assertRaises(ValueError):
                     bundle.tool("age")
+
+    def test_decrypted_temp_file_stays_next_to_destination(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, restore_root = root / "source", root / "restore"
+            source.mkdir()
+            restore_root.mkdir()
+            (source / "db.sql").write_bytes(b"synthetic")
+            archive = root / "backup.age"
+            bundle.pack(source, archive, self.recipient, self.meta)
+            real = tempfile.TemporaryFile
+            with patch.object(bundle.tempfile, "TemporaryFile", wraps=real) as spy:
+                bundle.unpack(archive, restore_root / "a", self.identity)
+                self.assertEqual(spy.call_args.kwargs["dir"], restore_root)
+                bundle.unpack(archive, restore_root / "b", self.identity, work_dir=root)
+                self.assertEqual(spy.call_args.kwargs["dir"], root)
+            with self.assertRaises(ValueError):
+                bundle.unpack(archive, restore_root / "c", self.identity, work_dir=root / "none")
+
+    def test_offline_placed_tool_is_used_and_failure_names_folder(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "age.lock.json").write_bytes((bundle.ROOT / "age.lock.json").read_bytes())
+            cached = Path(bundle.tool("age")).parent
+            down = OSError("network unreachable")
+            with (
+                patch.object(bundle, "ROOT", root),
+                patch.object(bundle.urllib.request, "urlopen", side_effect=down),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "data/tools/age-1.2.1"):
+                    bundle.tool("age")
+                target = root / "data/tools/age-1.2.1" / cached.name
+                for item in cached.iterdir():
+                    shutil.copy2(item, target / item.name)
+                self.assertEqual(bundle.tool("age"), str(target / "age"))

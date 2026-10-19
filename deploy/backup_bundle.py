@@ -46,11 +46,16 @@ def tool(name):
         for n, expected in spec["files"].items()
     ):
         return str(target)
-    with (
-        urllib.request.urlopen(spec["url"], timeout=60) as response,
-        tempfile.TemporaryFile() as archive,
-    ):
-        shutil.copyfileobj(response, archive)
+    with tempfile.TemporaryFile() as archive:
+        try:
+            with urllib.request.urlopen(spec["url"], timeout=60) as response:
+                shutil.copyfileobj(response, archive)
+        except OSError as error:
+            # 国内服务器常连不上 GitHub 发布文件：可离线放置官方文件，摘要一致即直接使用。
+            raise RuntimeError(
+                f"无法下载 age；离线环境请把官方 {spec['url'].rsplit('/', 1)[-1]} 里的 "
+                f"{'、'.join(spec['files'])} 放到 {folder}，摘要须与 age.lock.json 一致。"
+            ) from error
         archive.seek(0)
         if sha(archive) != spec["sha256"]:
             raise ValueError("age 官方包摘要不符。")
@@ -152,11 +157,15 @@ def pack(source, output, recipient, metadata):
     return manifest
 
 
-def unpack(source, destination, identity):
+def unpack(source, destination, identity, work_dir=None):
     destination = Path(destination)
     if destination.exists() or destination.is_symlink():
         raise ValueError("只允许解包到不存在的新目录。")
-    with tempfile.TemporaryFile() as clear, open(source, "rb") as encrypted:
+    # 解密明文默认放在目标同一分区，不用可能是内存盘、空间小的 /tmp。
+    work = Path(work_dir) if work_dir is not None else destination.parent
+    if work.is_symlink() or not work.is_dir():
+        raise ValueError("解密临时目录必须是已存在的普通目录。")
+    with tempfile.TemporaryFile(dir=work) as clear, open(source, "rb") as encrypted:
         subprocess.run(
             [tool("age"), "-d", "-i", str(identity)],
             stdin=encrypted,
