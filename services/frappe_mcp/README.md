@@ -22,6 +22,19 @@
 | `my_responsibilities` | 自己的岗位名称和岗位职责（X1 在“岗位”上加的“岗位职责”，富文本转成纯文本，最多 3000 字） | 只查自己档案上的岗位 |
 | `draft_leave` | 请假草稿（类型、起止日期、事由、剩余天数）和签名的 `draft_token`；**不写 HR 系统** | 只给自己起草 |
 
+## 按岗位开关（P2-C2）
+
+HR 在 Frappe 的“岗位”上勾选这个岗位的员工能用哪些助手功能（X1 加的勾选框，见任务卡 P2-G3）：
+
+| 开关 | 管的工具 |
+| --- | --- |
+| `eb_tool_leave_query` | `leave_balance`、`my_leave_applications` |
+| `eb_tool_leave_apply` | `draft_leave`、`/v1/leave/confirm`（起草后被关掉的也不再提交） |
+| `eb_tool_approval` | `pending_my_approval` |
+| `eb_tool_duties` | `my_responsibilities` |
+
+关掉的功能返回“你的岗位没有开通……，需要的话请联系 HR”，不查 HR 数据。员工档案没有岗位、或开关是空值时按开处理。Dify 里所有工具照常绑定，不用按岗位建多个应用。**X1 要先升级**：X1 没放行这些字段时 Frappe 拒绝查询，X4 报“HR 系统暂时不可用”，不会默认放开。
+
 只返回上面列出的字段，不返回手机号、身份证号、银行卡、薪资；审批人邮箱也不返回。Frappe 出错时返回“HR 系统暂时不可用”，不报 500。
 
 ## 发起请假：员工确认后才提交

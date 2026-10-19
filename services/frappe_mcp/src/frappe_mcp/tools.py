@@ -28,6 +28,15 @@ MAX_REASON = 140
 MAX_DAYS = 90
 NO_DESIGNATION = "你的员工档案里还没有岗位，请联系 HR 补上。"
 NO_DUTIES = "你的岗位还没有填写岗位职责，请联系 HR。"
+# 按岗位开关的功能：工具 → X1 在“岗位”上加的勾选框。员工没有岗位时按开处理。
+TOOL_SWITCHES = {
+    "leave_balance": ("eb_tool_leave_query", "查假期和请假记录"),
+    "my_leave_applications": ("eb_tool_leave_query", "查假期和请假记录"),
+    "draft_leave": ("eb_tool_leave_apply", "发起请假"),
+    "confirm_leave": ("eb_tool_leave_apply", "发起请假"),
+    "pending_my_approval": ("eb_tool_approval", "查待我审批"),
+    "my_responsibilities": ("eb_tool_duties", "查岗位职责"),
+}
 # 岗位职责是 HR 录的富文本，转成纯文本后最多给模型这么多字
 MAX_DUTIES = 3000
 
@@ -59,7 +68,7 @@ class Tools:
             ]
             return {"employee_name": emp.employee_name, "balances": items}
 
-        return await self._as_user(session_token, run)
+        return await self._as_user(session_token, run, "leave_balance")
 
     async def my_leave_applications(self, session_token: str) -> dict[str, Any]:
         async def run(emp: Employee) -> dict[str, Any]:
@@ -68,7 +77,7 @@ class Tools:
             )
             return {"employee_name": emp.employee_name, "applications": [_leave(r) for r in rows]}
 
-        return await self._as_user(session_token, run)
+        return await self._as_user(session_token, run, "my_leave_applications")
 
     async def pending_my_approval(self, session_token: str) -> dict[str, Any]:
         async def run(emp: Employee) -> dict[str, Any]:
@@ -93,7 +102,7 @@ class Tools:
             ]
             return {"employee_name": emp.employee_name, "applications": items}
 
-        return await self._as_user(session_token, run)
+        return await self._as_user(session_token, run, "pending_my_approval")
 
     async def my_responsibilities(self, session_token: str) -> dict[str, Any]:
         async def run(emp: Employee) -> dict[str, Any]:
@@ -113,7 +122,7 @@ class Tools:
                 "truncated": len(text) > MAX_DUTIES,
             }
 
-        return await self._as_user(session_token, run)
+        return await self._as_user(session_token, run, "my_responsibilities")
 
     async def draft_leave(
         self, session_token: str, leave_type: str, from_date: str, to_date: str, reason: str = ""
@@ -160,7 +169,7 @@ class Tools:
                 f"{self._s.draft_ttl_seconds // 60} 分钟内有效。",
             }
 
-        return await self._as_user(session_token, run)
+        return await self._as_user(session_token, run, "draft_leave")
 
     async def confirm_leave(self, user_id: str, draft_token: str) -> dict[str, Any]:
         """员工本人回复确认后，由工作流（不是模型）调用，把草稿原样提交到 HR 系统。"""
@@ -174,6 +183,9 @@ class Tools:
             emp = await self._hr.employee(user_id)
             if emp is None or emp.name != draft.get("emp"):
                 return {"ok": False, "error": NO_EMPLOYEE}
+            # 起草后岗位被关掉“发起请假”的，确认时也不再提交
+            if off := await self._switched_off(emp, "confirm_leave"):
+                return {"ok": False, "error": off}
             name = await self._hr.create_leave(
                 {
                     "employee": emp.name,
@@ -198,7 +210,9 @@ class Tools:
             f"{draft['from_date']} 至 {draft['to_date']}），等待审批。",
         }
 
-    async def _as_user(self, token: str, run: Callable[[Employee], Any]) -> dict[str, Any]:
+    async def _as_user(
+        self, token: str, run: Callable[[Employee], Any], tool: str
+    ) -> dict[str, Any]:
         try:
             uid = session.verify(self._secret, token)
         except session.SessionError as e:
@@ -207,11 +221,23 @@ class Tools:
             emp = await self._hr.employee(uid)
             if emp is None:
                 return {"error": NO_EMPLOYEE}
+            if off := await self._switched_off(emp, tool):
+                return {"employee_name": emp.employee_name, "error": off}
             result: dict[str, Any] = await run(emp)
             return result
         except httpx.HTTPError as e:
             log.warning("frappe unavailable: %s", type(e).__name__)
             return {"error": UNAVAILABLE}
+
+    async def _switched_off(self, emp: Employee, tool: str) -> str | None:
+        """员工岗位关掉了这个功能时返回给员工的提示，没关返回 None。"""
+        field, label = TOOL_SWITCHES[tool]
+        if not emp.designation:
+            return None
+        if (await self._hr.tool_switches(emp.designation)).get(field, True):
+            return None
+        log.info("tool off for designation: %s", tool)
+        return f"你的岗位没有开通“{label}”，需要的话请联系 HR。"
 
 
 STATE_MANAGER, STATE_HR, STATE_RETURNED = "EB Leave Manager", "EB Leave HR", "EB Leave Returned"

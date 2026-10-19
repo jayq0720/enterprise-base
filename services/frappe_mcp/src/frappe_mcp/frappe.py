@@ -31,6 +31,14 @@ LEAVE_FIELDS = [
     "eb_leave_state",
 ]
 
+# 岗位上的助手功能开关（X1 加的勾选框），哪个工具对应哪个开关见 tools.TOOL_SWITCHES
+TOOL_SWITCH_FIELDS = (
+    "eb_tool_leave_query",
+    "eb_tool_leave_apply",
+    "eb_tool_approval",
+    "eb_tool_duties",
+)
+
 
 class Employee(BaseModel):
     name: str
@@ -63,6 +71,8 @@ class HR(Protocol):
     async def create_leave(self, doc: dict[str, Any]) -> str: ...
 
     async def responsibilities(self, designation: str) -> str | None: ...
+
+    async def tool_switches(self, designation: str) -> dict[str, bool]: ...
 
 
 class FrappeHR:
@@ -143,6 +153,20 @@ class FrappeHR:
         if not rows:
             return None
         return str(rows[0].get("eb_responsibilities") or "")
+
+    async def tool_switches(self, designation: str) -> dict[str, bool]:
+        """岗位上的助手功能开关（X1 在 Designation 上加的勾选框），岗位不存在返回空。
+
+        X1 的 X4 接口白名单要放行这些字段，所以 X1 要先于本服务升级；
+        还没升级时 Frappe 拒绝查询，按 HR 系统不可用处理，不会默认放开。
+        """
+        rows = await self._list(
+            "Designation", [["name", "=", designation]], ["name", *TOOL_SWITCH_FIELDS], 1
+        )
+        if not rows:
+            return {}
+        # 字段刚加上、还没写过值的老岗位是空值，按开处理
+        return {f: rows[0].get(f) is None or bool(rows[0][f]) for f in TOOL_SWITCH_FIELDS}
 
     async def _list(
         self,

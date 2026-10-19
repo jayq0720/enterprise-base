@@ -35,6 +35,8 @@ class FakeHR:
         self.down = False
         self.reject: FrappeRejected | None = None
         self.created: list[dict[str, Any]] = []
+        # 岗位 → 功能开关；没配的岗位相当于 X1 还没加开关字段
+        self.switches: dict[str, dict[str, bool]] = {}
 
     async def employee(self, wecom_userid: str) -> Employee | None:
         if self.down:
@@ -85,3 +87,6 @@ class FakeHR:
     async def responsibilities(self, designation: str) -> str | None:
         self.calls.append(("duties", designation))
         return self.duties.get(designation)
+
+    async def tool_switches(self, designation: str) -> dict[str, bool]:
+        return self.switches.get(designation, {})
