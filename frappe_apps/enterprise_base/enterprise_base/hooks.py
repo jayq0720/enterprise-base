@@ -35,6 +35,11 @@ fixtures = [
                 [
                     "Designation-eb_responsibilities",
                     "Designation-eb_knowledge_spaces",
+                    "Designation-eb_assistant_tools_section",
+                    "Designation-eb_tool_leave_query",
+                    "Designation-eb_tool_leave_apply",
+                    "Designation-eb_tool_approval",
+                    "Designation-eb_tool_duties",
                     "Employee-wecom_userid",
                     "Department-eb_wecom_department_id",
                     "Employee-eb_hr_approver",
@@ -100,3 +105,17 @@ doc_events["Leave Application"]["on_update"] = "enterprise_base.wecom.card_deliv
 persistent_cache_keys = ["eb-org-import"]
 scheduler_events = {"hourly": ["enterprise_base.wecom.sync.hourly"]}
 scheduler_events["hourly"].append("enterprise_base.wecom.card_delivery.retry")
+
+before_migrate = ["enterprise_base.duties.tool_switches.backfill"]
+after_sync.append("enterprise_base.duties.tool_switches.configure")
+after_migrate.extend(
+    [
+        "enterprise_base.duties.tool_switches.configure",
+        "enterprise_base.duties.tool_switches.backfill",
+    ]
+)
+after_install.append("enterprise_base.duties.tool_switches.backfill")
+doc_events["Designation"]["validate"] = [
+    "enterprise_base.duties.validation.validate_scope_name",
+    "enterprise_base.duties.tool_switches.validate",
+]
