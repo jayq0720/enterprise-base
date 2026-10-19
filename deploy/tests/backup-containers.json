@@ -1,0 +1,200 @@
+{
+  "/caddy": {
+    "Id": "/caddy",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer",
+        "com.docker.compose.service": "caddy"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer": {}
+      }
+    }
+  },
+  "/wechat": {
+    "Id": "/wechat",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer",
+        "com.docker.compose.service": "wechat"
+      }
+    },
+    "State": {
+      "Running": false
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer": {}
+      }
+    }
+  },
+  "-hr/db": {
+    "Id": "-hr/db",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-hr",
+        "com.docker.compose.service": "db"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-hr": {}
+      }
+    }
+  },
+  "-hr/backend": {
+    "Id": "-hr/backend",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-hr",
+        "com.docker.compose.service": "backend"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-hr": {}
+      }
+    }
+  },
+  "-hr/scheduler": {
+    "Id": "-hr/scheduler",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-hr",
+        "com.docker.compose.service": "scheduler"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-hr": {}
+      }
+    }
+  },
+  "-dify/api": {
+    "Id": "-dify/api",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-dify",
+        "com.docker.compose.service": "api"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-dify": {}
+      }
+    }
+  },
+  "-dify/plugin_daemon": {
+    "Id": "-dify/plugin_daemon",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-dify",
+        "com.docker.compose.service": "plugin_daemon"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-dify": {}
+      }
+    }
+  },
+  "-dify/db_postgres": {
+    "Id": "-dify/db_postgres",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-dify",
+        "com.docker.compose.service": "db_postgres"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-dify": {}
+      }
+    }
+  },
+  "-dify/qdrant": {
+    "Id": "-dify/qdrant",
+    "Image": "sha256:fixed",
+    "Config": {
+      "Image": "official:1.2.3",
+      "Env": [
+        "PRIVATE=must-not-leak"
+      ],
+      "Labels": {
+        "com.docker.compose.project": "customer-dify",
+        "com.docker.compose.service": "qdrant"
+      }
+    },
+    "State": {
+      "Running": true
+    },
+    "NetworkSettings": {
+      "Networks": {
+        "customer-dify": {}
+      }
+    }
+  }
+}
