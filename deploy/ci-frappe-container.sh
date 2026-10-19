@@ -18,7 +18,7 @@ for site in contract.local import.local; do
 import sys
 import frappe
 from enterprise_base.tests.tool_switch_probe import seed_before_install
-frappe.init(site=sys.argv[1])
+frappe.init(site=sys.argv[1], sites_path="sites")
 frappe.connect()
 try:
     seed_before_install()
