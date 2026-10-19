@@ -17,9 +17,11 @@ for site in contract.local import.local; do
   if test "$site" = contract.local; then
   ./env/bin/python - "$site" <<'PY'
 import sys
+import os
 import frappe
 from enterprise_base.tests.tool_switch_probe import seed_before_install
-frappe.init(site=sys.argv[1], sites_path="sites")
+os.chdir("sites")
+frappe.init(site=sys.argv[1])
 frappe.connect()
 try:
     seed_before_install()
