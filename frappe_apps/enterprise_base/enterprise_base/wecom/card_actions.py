@@ -41,7 +41,8 @@ def locked(task):
         return None
     if not frappe.db.sql("select name from `tabEB Approval Card` where name=%s for update", task):
         return None
-    return frappe.get_doc(DT, task)
+    # 普通读拿的是事务开头的快照；发卡任务刚改过卡片时，保存会报“文档已被修改”
+    return frappe.get_doc(DT, task, for_update=True)
 
 
 def enqueue(card):
@@ -104,7 +105,7 @@ def apply(event):
                 card.save(ignore_permissions=True)
                 enqueue(card.name)
             return True
-        doc = frappe.get_doc("Leave Application", leave)
+        doc = frappe.get_doc("Leave Application", leave, for_update=True)
         stage = doc.get("eb_leave_state")
         if stage not in STAGES or card.stage != stage or doc.get(STAGES[stage][0]) != user:
             raise frappe.PermissionError

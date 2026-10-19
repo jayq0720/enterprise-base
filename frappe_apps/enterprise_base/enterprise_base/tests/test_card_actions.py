@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.app import application
+from frappe.database import get_db
 from frappe.tests.utils import FrappeTestCase
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
@@ -92,6 +93,38 @@ class TestCardActions(FrappeTestCase):
             self.assertEqual(self.doc.eb_leave_state, "EB Leave Returned")
             for value in [*self.data["private_samples"], "synthetic-action-code"]:
                 self.assertNotIn(value, str(logger.mock_calls))
+
+    def test_card_changed_by_delivery_job_after_snapshot(self):
+        card = self.card()
+        frappe.db.commit()
+        # 本事务先读一次卡片表，建立快照；再由另一个连接模拟发卡任务改卡片并提交
+        frappe.db.get_value(actions.DT, card.name, "modified")
+        other = get_db(
+            host=frappe.conf.db_host,
+            port=frappe.conf.db_port,
+            user=frappe.conf.db_user or frappe.conf.db_name,
+            password=frappe.conf.db_password,
+            cur_db_name=frappe.conf.db_name,
+        )
+        try:
+            other.sql(
+                "update `tabEB Approval Card` set attempts=1, modified=now(6) where name=%s",
+                card.name,
+            )
+            other.commit()
+        finally:
+            other.close()
+        try:
+            with patch.dict(frappe.conf, eb_wecom_cards=self.cfg), patch.object(frappe, "enqueue"):
+                self.assertTrue(actions.apply(self.event(card)))
+            self.doc.reload()
+            self.assertEqual(self.doc.eb_leave_state, "EB Leave HR")
+        finally:
+            frappe.set_user("Administrator")
+            frappe.db.rollback()
+            for dt, name in ((actions.DT, card.name), ("Leave Application", self.doc.name)):
+                frappe.delete_doc(dt, name, force=1, ignore_permissions=True)
+            frappe.db.commit()
 
     def test_self_approval_and_public_method_denied(self):
         user = frappe.get_doc("User", self.users["staff"])

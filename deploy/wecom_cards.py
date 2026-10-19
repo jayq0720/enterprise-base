@@ -56,7 +56,7 @@ def configuration(values):
 APPLY = """import json, os, pathlib, sys, tempfile
 import frappe
 site = sys.argv[1]
-frappe.init(site=site, sites_path="sites")
+frappe.init(site=site, sites_path=".")
 frappe.connect()
 cfg = json.load(sys.stdin)
 if cfg["enabled"]:
@@ -68,7 +68,7 @@ if cfg["enabled"]:
     events = frappe.get_hooks("doc_events").get("Leave Application", {}).get("on_update", [])
     assert "enterprise_base.wecom.card_delivery.on_update" in events
     assert "enterprise_base.wecom.callback.guard" in frappe.get_hooks("before_request")
-path = pathlib.Path("sites") / site / "site_config.json"
+path = pathlib.Path(site) / "site_config.json"
 data = json.loads(path.read_text())
 data["eb_wecom_cards"] = cfg
 if cfg["enabled"]:
@@ -125,8 +125,11 @@ def main():
                 "data/frappe/eb-compose.yaml",
                 "exec",
                 "-T",
+                # Frappe 按相对路径 ../logs 写日志，必须在 sites 目录里跑
+                "-w",
+                "/home/frappe/frappe-bench/sites",
                 "backend",
-                "env/bin/python",
+                "../env/bin/python",
                 "-c",
                 APPLY,
                 "hr." + values["EB_DOMAIN"],
