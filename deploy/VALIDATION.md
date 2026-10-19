@@ -29,3 +29,7 @@
 原生 Caddy 探测不经过 Docker 的 userland-proxy/NAT，也没有验证真实 IPv6 客户端。上线前仍须按 [ADMIN-ACCESS.md](ADMIN-ACCESS.md) 实测本机初始化、远端允许/403 和 Caddy 来源 IP；不能因配置校验通过就将公网来源校验记为通过。
 
 不覆盖的验收：镜像构建、登录、30 分钟目标、重启保留数据、权限接口的运行拒绝、fixtures 空库导入、真实企业微信或模型调用。JQ 已安排这些测试在服务器准备后完成，不能根据本校验勾选它们。
+
+岗位开关另由 `frappe-contract` 原生 CI 验证：在临时 `contract.local` 安装 App 后，把四个开关列还原成允许空值的旧列，仅将合成“未设置”岗位置空，保留合成关闭/开启岗位的 0/1。完整执行两次 `bench migrate`，每次核对空值补 1、0/1 保持，再运行 App 权限测试、导出配置并导入第二空站点；不跳过迁移补丁或失败项。这会实际经过 before_migrate、原生 schema/fixtures 同步和 after_migrate，区别于直接调用配置函数。准备旧列的入口要求启用测试、App 已安装且站点名为 `contract.local`，不作为服务器运维命令提供。
+
+`make verify` 不启动上述数据库迁移；原生 CI 成功也不能代替客户数据库备份、测试升级和企业微信联测。
