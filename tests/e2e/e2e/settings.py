@@ -32,6 +32,18 @@ class E2ESettings(BaseSettings):
     x4_url: HttpUrl
     x4_token: SecretStr
 
+    # 企业微信回调（X2 统一入口）：不填地址就跳过企业微信测试。
+    # 测试环境要配一套合成的企业微信应用参数，和 Frappe 站点 eb_wecom_cards、
+    # dify-on-wechat 用同一套；不要用真实企业的 Token 和 EncodingAESKey。
+    wecom_callback_url: HttpUrl | None = None
+    wecom_callback_host: str | None = None
+    wecom_corp_id: str = ""
+    wecom_agent_id: str = ""
+    wecom_token: SecretStr | None = None
+    wecom_aes_key: SecretStr | None = None
+    # 普通消息是否转给 dify-on-wechat 并进 HR 助手；聊天入口没起时设成 false，只测审批卡片
+    wecom_chat: bool = True
+
     # 发起请假测试用的假期类型（测试会给合成员工分配这类假期）
     leave_type: str = "年假"
     # 等 Webhook → X5 → Dify 同步完成的最长秒数

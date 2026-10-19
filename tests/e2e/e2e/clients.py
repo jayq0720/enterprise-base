@@ -19,15 +19,25 @@ def _client(base: str, host: str | None, headers: dict[str, str], timeout: float
 class Frappe:
     """测试环境管理员身份，只用来准备和清理合成数据。"""
 
-    def __init__(self, s: E2ESettings) -> None:
-        key = s.frappe_admin_key.get_secret_value()
-        secret = s.frappe_admin_secret.get_secret_value()
+    def __init__(self, s: E2ESettings, key: str = "", secret: str = "") -> None:
+        self._s = s
+        key = key or s.frappe_admin_key.get_secret_value()
+        secret = secret or s.frappe_admin_secret.get_secret_value()
         self.http = _client(
             str(s.frappe_url),
             s.frappe_host,
             {"Authorization": f"token {key}:{secret}"},
             s.http_timeout_seconds,
         )
+
+    def as_user(self, user: str) -> "Frappe":
+        """给合成用户生成 API Key，以本人身份办工作流动作（例如清理时撤销已批的请假）。"""
+        r = self.http.post(
+            "/api/method/frappe.core.doctype.user.user.generate_keys", json={"user": user}
+        )
+        _check(r)
+        secret = str(r.json()["message"]["api_secret"])
+        return Frappe(self._s, str(self.get("User", user)["api_key"]), secret)
 
     def insert(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         r = self.http.post(f"/api/resource/{doctype}", json=doc)
@@ -174,6 +184,19 @@ class HRAssistant:
         _check(r)
         data = r.json()
         return str(data.get("answer") or ""), str(data.get("conversation_id") or "")
+
+    def messages(self, user_id: str) -> list[dict[str, Any]]:
+        """这个员工在 HR 助手里的全部消息（各会话按时间先后），用来核对企业微信入口。"""
+        r = self.http.get("/conversations", params={"user": user_id, "limit": 20})
+        _check(r)
+        out: list[dict[str, Any]] = []
+        for conv in r.json().get("data", []):
+            m = self.http.get(
+                "/messages", params={"user": user_id, "conversation_id": conv["id"], "limit": 50}
+            )
+            _check(m)
+            out += m.json().get("data", [])
+        return sorted(out, key=lambda m: m.get("created_at") or 0)
 
 
 def wait_for[T](check: Callable[[], T | None], timeout: float, interval: float = 3) -> T:

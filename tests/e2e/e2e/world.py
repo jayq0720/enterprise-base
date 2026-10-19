@@ -8,11 +8,12 @@
 """
 
 import datetime
+import functools
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from e2e.clients import DifyDatasets, Frappe
+from e2e.clients import DifyDatasets, Frappe, wait_for
 from e2e.settings import E2ESettings
 
 
@@ -38,9 +39,36 @@ class World:
     # 合成的敏感值：任何服务的返回里都不能出现
     sensitive: list[str]
     cleanup: list[Callable[[], None]] = field(default_factory=list)
+    allocated: bool = False
 
     def root(self, frappe: Frappe, wiki_space: str) -> str:
         return str(frappe.get("Wiki Space", wiki_space)["root_group"])
+
+    def allocate_leave(self, frappe: Frappe, leave_type: str) -> None:
+        """给 A 发 10 天假期额度。同一员工同一时段只能有一份，几个测试共用，只发一次。"""
+        if self.allocated:
+            return
+        today = datetime.date.today()
+        allocation = str(
+            frappe.insert(
+                "Leave Allocation",
+                {
+                    "employee": self.a.employee,
+                    "leave_type": leave_type,
+                    "from_date": f"{today.year}-01-01",
+                    "to_date": f"{today.year + 1}-12-31",
+                    "new_leaves_allocated": 10,
+                    "docstatus": 1,
+                },
+            )["name"]
+        )
+
+        def drop() -> None:
+            frappe.update("Leave Allocation", allocation, {"docstatus": 2})
+            frappe.delete("Leave Allocation", allocation)
+
+        self.cleanup.append(drop)
+        self.allocated = True
 
 
 def build(s: E2ESettings, frappe: Frappe, dify: DifyDatasets) -> World:
@@ -183,6 +211,29 @@ def build(s: E2ESettings, frappe: Frappe, dify: DifyDatasets) -> World:
     except BaseException:
         teardown(undo)
         raise
+
+
+def drop_leave(frappe: Frappe, name: str) -> None:
+    """删请假单。先删引用它的企业微信卡片记录和作废的考勤，否则删不掉。
+
+    已批的单要先由 HR 审批人撤销，调用方自己处理。
+    """
+    for card in frappe.names("EB Approval Card", [["leave_application", "=", name]]):
+        # 先等后台发卡、改卡任务做完，删除和它抢同一条记录会超时
+        wait_for(functools.partial(_card_settled, frappe, card), 30, 1)
+        frappe.delete("EB Approval Card", card)
+    # 批准时 HRMS 会按请假日期建考勤，撤销后考勤一起作废
+    for att in frappe.names("Attendance", [["leave_application", "=", name]]):
+        frappe.delete("Attendance", att)
+    frappe.delete("Leave Application", name)
+
+
+def _card_settled(frappe: Frappe, card: str) -> bool | None:
+    doc = frappe.get("EB Approval Card", card)
+    busy = doc["status"] == "Pending" or (
+        doc["status"] == "Done" and doc.get("update_status") == "Pending"
+    )
+    return None if busy else True
 
 
 def teardown(undo: list[Callable[[], None]]) -> list[str]:
