@@ -130,6 +130,58 @@ class TestOnboarding(FrappeTestCase):
             for value in self.data["private_samples"]:
                 self.assertNotIn(value, str(logger.mock_calls))
 
+    def test_owner_closing_own_todo_completes_task(self):
+        employee = self.employee()
+        name = frappe.get_all("Employee Onboarding", {"employee": employee.name}, pluck="name")[0]
+        activities = frappe.get_doc("Employee Onboarding", name).activities
+        own = activities[-1]
+
+        def todo(activity):
+            return frappe.get_doc(
+                "ToDo",
+                {
+                    "reference_type": "Task",
+                    "reference_name": activity.task,
+                    "allocated_to": activity.user,
+                },
+            )
+
+        # 别人替负责人关掉待办：任务不动
+        frappe.set_user(self.hr)
+        other = todo(own)
+        other.status = "Closed"
+        other.save(ignore_permissions=True)
+        self.assertEqual(frappe.db.get_value("Task", own.task, "status"), "Open")
+        other.status = "Open"
+        other.save(ignore_permissions=True)
+        # 负责人自己关掉：只完成自己那一项，入职单还没全部完成
+        frappe.set_user(own.user)
+        mine = todo(own)
+        mine.status = "Closed"
+        mine.save()
+        frappe.set_user("Administrator")
+        self.assertEqual(frappe.db.get_value("Task", own.task, "status"), "Completed")
+        self.assertEqual(frappe.db.get_value("Task", activities[0].task, "status"), "Open")
+        self.assertEqual(
+            frappe.db.get_value("Employee Onboarding", name, "boarding_status"), "In Process"
+        )
+        # 不是入职单里的任务，关待办不会完成任务
+        task = frappe.get_doc(dict(doctype="Task", subject="Unrelated synthetic task")).insert()
+        unrelated = frappe.get_doc(
+            dict(
+                doctype="ToDo",
+                reference_type="Task",
+                reference_name=task.name,
+                allocated_to=self.assignee,
+                description="synthetic",
+            )
+        ).insert(ignore_permissions=True)
+        frappe.set_user(self.assignee)
+        unrelated.status = "Closed"
+        unrelated.save(ignore_permissions=True)
+        frappe.set_user("Administrator")
+        self.assertEqual(frappe.db.get_value("Task", task.name, "status"), "Open")
+
     def test_missing_recruitment_does_not_invent_records(self):
         applicants, offers = frappe.db.count("Job Applicant"), frappe.db.count("Job Offer")
         with patch.object(frappe, "msgprint") as message:
