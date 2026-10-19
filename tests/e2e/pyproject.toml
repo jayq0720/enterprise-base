@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "端到端测试：对一套已部署的测试环境，用合成数据走通 X1–X5 和 HR 助手"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=43",
     "httpx>=0.27",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
