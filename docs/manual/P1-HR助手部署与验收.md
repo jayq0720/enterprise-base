@@ -1,5 +1,7 @@
 # HR 助手部署与验收（P1-G7）
 
+员工日常操作见[用户手册](用户手册.md)；本篇保留管理员部署和开发验收说明。
+
 本步骤用于独立测试环境，先按 [LOCAL.md](../../deploy/LOCAL.md) 完成 Frappe/Dify 初始化。X3/X4 放在 `frappe-services.yaml`：两者依赖 Frappe，与 X5 共用其默认网络，Dify 只有 SSRF 代理进 edge 网络，HTTP 节点和 MCP 调用都经代理访问 X3/X4，Dify api/worker 不直连。采用 `hr-assistant` profile，首次建站时不要求尚未生成的接口凭据；无宿主机端口，不添加 Caddy 路由。
 
 ## 账号与启动
