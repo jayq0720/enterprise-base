@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from frappe_mcp.config import Settings
-from frappe_mcp.frappe import Employee, FrappeRejected
+from frappe_mcp.frappe import TOOL_SWITCH_FIELDS, Employee, FrappeRejected
 
 TOKEN = "t" * 40
 SECRET = "s" * 40
@@ -28,13 +28,19 @@ class FakeHR:
             "zhangsan": Employee(
                 name="E1", employee_name="张三", user_id="zs@example.com", designation="出纳"
             ),
-            "lisi": Employee(name="E2", employee_name="李四", user_id="ls@example.com"),
+            "lisi": Employee(
+                name="E2", employee_name="李四", user_id="ls@example.com", designation="主管"
+            ),
+            "wangwu": Employee(name="E3", employee_name="王五", user_id="ww@example.com"),
         }
         self.duties = {"出纳": "<p>负责&nbsp;现金收付</p><ul><li>日记账</li><li>对账</li></ul>"}
         self.calls: list[tuple[str, object]] = []
         self.down = False
         self.reject: FrappeRejected | None = None
         self.created: list[dict[str, Any]] = []
+        # 岗位 → 功能开关；X1 升级后已有岗位的开关都是开，不在这里的岗位相当于不存在
+        on = dict.fromkeys(TOOL_SWITCH_FIELDS, True)
+        self.switches: dict[str, dict[str, bool | None]] = {"出纳": {**on}, "主管": {**on}}
 
     async def employee(self, wecom_userid: str) -> Employee | None:
         if self.down:
@@ -85,3 +91,6 @@ class FakeHR:
     async def responsibilities(self, designation: str) -> str | None:
         self.calls.append(("duties", designation))
         return self.duties.get(designation)
+
+    async def tool_switches(self, designation: str) -> dict[str, bool | None] | None:
+        return self.switches.get(designation)
