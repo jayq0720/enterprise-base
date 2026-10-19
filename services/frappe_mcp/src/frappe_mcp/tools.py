@@ -28,7 +28,7 @@ MAX_REASON = 140
 MAX_DAYS = 90
 NO_DESIGNATION = "你的员工档案里还没有岗位，请联系 HR 补上。"
 NO_DUTIES = "你的岗位还没有填写岗位职责，请联系 HR。"
-# 按岗位开关的功能：工具 → X1 在“岗位”上加的勾选框。员工没有岗位时按开处理。
+# 按岗位开关的功能：工具 → X1 在“岗位”上加的勾选框。员工没有岗位、岗位不存在一律拒绝。
 TOOL_SWITCHES = {
     "leave_balance": ("eb_tool_leave_query", "查假期和请假记录"),
     "my_leave_applications": ("eb_tool_leave_query", "查假期和请假记录"),
@@ -230,11 +230,20 @@ class Tools:
             return {"error": UNAVAILABLE}
 
     async def _switched_off(self, emp: Employee, tool: str) -> str | None:
-        """员工岗位关掉了这个功能时返回给员工的提示，没关返回 None。"""
+        """这个功能不能用时返回给员工的提示，能用返回 None。
+
+        没有岗位或岗位不存在：拒绝（AGENTS.md 查不到岗位一律拒绝）；
+        开关没有值：按 HR 系统不可用处理，不默认放开（X1 升级时会把老岗位补成开）。
+        """
         field, label = TOOL_SWITCHES[tool]
-        if not emp.designation:
-            return None
-        if (await self._hr.tool_switches(emp.designation)).get(field, True):
+        switches = await self._hr.tool_switches(emp.designation) if emp.designation else None
+        if switches is None:
+            return NO_DESIGNATION
+        value = switches.get(field)
+        if value is None:
+            log.warning("tool switch unset: %s", field)
+            return UNAVAILABLE
+        if value:
             return None
         log.info("tool off for designation: %s", tool)
         return f"你的岗位没有开通“{label}”，需要的话请联系 HR。"

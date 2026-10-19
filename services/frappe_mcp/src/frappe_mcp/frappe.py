@@ -72,7 +72,7 @@ class HR(Protocol):
 
     async def responsibilities(self, designation: str) -> str | None: ...
 
-    async def tool_switches(self, designation: str) -> dict[str, bool]: ...
+    async def tool_switches(self, designation: str) -> dict[str, bool | None] | None: ...
 
 
 class FrappeHR:
@@ -154,19 +154,19 @@ class FrappeHR:
             return None
         return str(rows[0].get("eb_responsibilities") or "")
 
-    async def tool_switches(self, designation: str) -> dict[str, bool]:
-        """岗位上的助手功能开关（X1 在 Designation 上加的勾选框），岗位不存在返回空。
+    async def tool_switches(self, designation: str) -> dict[str, bool | None] | None:
+        """岗位上的助手功能开关（X1 在 Designation 上加的勾选框），岗位不存在返回 None。
 
         X1 的 X4 接口白名单要放行这些字段，所以 X1 要先于本服务升级；
-        还没升级时 Frappe 拒绝查询，按 HR 系统不可用处理，不会默认放开。
+        还没升级时 Frappe 拒绝查询，按 HR 系统不可用处理。没写过值的开关原样返回 None。
         """
         rows = await self._list(
             "Designation", [["name", "=", designation]], ["name", *TOOL_SWITCH_FIELDS], 1
         )
         if not rows:
-            return {}
-        # 字段刚加上、还没写过值的老岗位是空值，按开处理
-        return {f: rows[0].get(f) is None or bool(rows[0][f]) for f in TOOL_SWITCH_FIELDS}
+            return None
+        row = rows[0]
+        return {f: None if row.get(f) is None else bool(row[f]) for f in TOOL_SWITCH_FIELDS}
 
     async def _list(
         self,

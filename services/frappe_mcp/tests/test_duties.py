@@ -31,8 +31,8 @@ async def test_own_designation_only(settings: Settings) -> None:
 
 async def test_no_designation(settings: Settings) -> None:
     tools, hr = make(settings)
-    out = await tools.my_responsibilities(tok("lisi"))
-    assert out == {"employee_name": "李四", "error": NO_DESIGNATION}
+    out = await tools.my_responsibilities(tok("wangwu"))
+    assert out == {"employee_name": "王五", "error": NO_DESIGNATION}
     assert hr.calls == []
 
 

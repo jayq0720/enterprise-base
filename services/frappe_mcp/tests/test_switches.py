@@ -1,19 +1,20 @@
 """按岗位开关助手功能（P2-C2）。"""
 
 import json
+from typing import Any
 
 import httpx
 
 from frappe_mcp.config import Settings
 from frappe_mcp.frappe import TOOL_SWITCH_FIELDS, FrappeHR
-from frappe_mcp.tools import UNAVAILABLE, Tools
+from frappe_mcp.tools import NO_DESIGNATION, UNAVAILABLE, Tools
 
 from .test_tools import draft, make, tok
 
 
 async def test_switched_off_tool_is_refused(settings: Settings) -> None:
     tools, hr = make(settings)
-    hr.switches["出纳"] = {"eb_tool_leave_query": False, "eb_tool_duties": True}
+    hr.switches["出纳"]["eb_tool_leave_query"] = False
     out = await tools.leave_balance(tok("zhangsan"))
     assert out == {
         "employee_name": "张三",
@@ -26,24 +27,48 @@ async def test_switched_off_tool_is_refused(settings: Settings) -> None:
     assert "responsibilities" in await tools.my_responsibilities(tok("zhangsan"))
 
 
-async def test_unset_switch_or_no_designation_means_on(settings: Settings) -> None:
-    tools, hr = make(settings)
-    # 岗位没有配开关
-    assert "balances" in await tools.leave_balance(tok("zhangsan"))
-    # 李四没有岗位
-    hr.switches["出纳"] = {"eb_tool_approval": False}
-    assert "applications" in await tools.pending_my_approval(tok("lisi"))
-    assert "error" in await tools.pending_my_approval(tok("zhangsan"))
+async def call_all(tools: Tools, uid: str) -> list[dict[str, Any]]:
+    return [
+        await tools.leave_balance(tok(uid)),
+        await tools.my_leave_applications(tok(uid)),
+        await tools.pending_my_approval(tok(uid)),
+        await tools.my_responsibilities(tok(uid)),
+        await draft(tools, uid),
+    ]
 
 
-async def test_leave_apply_switch_covers_draft_and_confirm(settings: Settings) -> None:
+async def test_no_or_unknown_designation_is_refused(settings: Settings) -> None:
     tools, hr = make(settings)
-    out = await draft(tools)
-    # 起草后 HR 关掉了“发起请假”，确认时不再提交
-    hr.switches["出纳"] = {"eb_tool_leave_apply": False}
-    done = await tools.confirm_leave("zhangsan", out["draft_token"])
-    assert done["ok"] is False and "发起请假" in done["error"] and hr.created == []
-    assert "发起请假" in (await draft(tools))["error"]
+    # 王五没有岗位；张三的岗位被删掉了
+    del hr.switches["出纳"]
+    for uid in ("wangwu", "zhangsan"):
+        for out in await call_all(tools, uid):
+            assert out["error"] == NO_DESIGNATION and "draft_token" not in out
+    assert hr.calls == []
+
+
+async def test_unset_switch_is_unavailable_not_on(settings: Settings) -> None:
+    tools, hr = make(settings)
+    hr.switches["出纳"] = dict.fromkeys(TOOL_SWITCH_FIELDS)
+    for out in await call_all(tools, "zhangsan"):
+        assert out["error"] == UNAVAILABLE and "draft_token" not in out
+    assert hr.calls == []
+
+
+async def test_leave_apply_checked_again_at_confirm(settings: Settings) -> None:
+    tools, hr = make(settings)
+    token = (await draft(tools))["draft_token"]
+    for change, word in (
+        (lambda: hr.switches["出纳"].update(eb_tool_leave_apply=False), "发起请假"),
+        (lambda: hr.switches["出纳"].update(eb_tool_leave_apply=None), UNAVAILABLE),
+        (lambda: hr.switches.pop("出纳"), NO_DESIGNATION),
+    ):
+        change()
+        done = await tools.confirm_leave("zhangsan", token)
+        assert done["ok"] is False and word in done["error"]
+    # 确认阶段也没有建请假单
+    assert hr.created == []
+    assert "draft_token" not in await draft(tools)
 
 
 async def test_frappe_reads_switches_from_designation(settings: Settings) -> None:
@@ -64,12 +89,12 @@ async def test_frappe_reads_switches_from_designation(settings: Settings) -> Non
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         hr = FrappeHR(settings, client)
         assert await hr.tool_switches("出纳") == {
-            "eb_tool_leave_query": True,
+            "eb_tool_leave_query": None,
             "eb_tool_leave_apply": True,
             "eb_tool_approval": True,
             "eb_tool_duties": False,
         }
-        assert await hr.tool_switches("会计") == {}
+        assert await hr.tool_switches("会计") is None
     # 按 X1 白名单的方式查：列表接口、指定字段、按名称精确过滤
     assert json.loads(seen[0]["fields"]) == ["name", *TOOL_SWITCH_FIELDS]
     assert json.loads(seen[0]["filters"]) == [["name", "=", "出纳"]]
