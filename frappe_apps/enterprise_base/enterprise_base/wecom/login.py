@@ -131,11 +131,12 @@ def _employee_user(userid):
         return None
     enabled, user_type = frappe.db.get_value("User", user, ["enabled", "user_type"]) or (0, "")
     roles = set(frappe.get_roles(user))
+    # 系统管理员权限最大，企业微信被盗即可进后台，只允许密码登录（第二轮安全审查 L2）。
     if (
         enabled
         and user_type == "System User"
         and "Employee" in roles
-        and not roles.intersection({"EB Integration", "EB X4"})
+        and not roles.intersection({"EB Integration", "EB X4", "System Manager"})
     ):
         return user
     return None

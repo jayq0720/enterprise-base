@@ -98,6 +98,7 @@ class TestPermissions(FrappeTestCase):
                         self.assertNotIn(field, row)
             request("staff", "GET", EMPLOYEE_API + "/" + hr_employee, 403)
             request("hr", "PUT", path, 403, json={"user_id": "p2-hr@test.invalid"})
+            request("hr", "PUT", path, 403, json={"leave_approver": "p2-hr@test.invalid"})
             request("hr", "PUT", space_path, 403, json={"visible_to_all": 1})
             request("manager", "PUT", space_path, json={"visible_to_all": 1})
             request("manager", "GET", data["position_path"])

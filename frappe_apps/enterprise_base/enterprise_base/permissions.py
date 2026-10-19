@@ -31,11 +31,13 @@ class Employee(EmployeeMaster):
         old = self.get_doc_before_save()
         changed = any(
             (self.get(f) or "") != ((old.get(f) or "") if old else "")
-            for f in ("user_id", "wecom_userid", "eb_hr_approver")
+            for f in ("user_id", "wecom_userid", "leave_approver", "eb_hr_approver")
         )
         manager = frappe.session.user == "Administrator" or "HR Manager" in frappe.get_roles()
         if changed and not manager:
-            frappe.throw("员工身份关联及 HR 审批人只能由 HR Manager 维护。", frappe.PermissionError)
+            frappe.throw(
+                "员工身份关联、主管和 HR 审批人只能由 HR Manager 维护。", frappe.PermissionError
+            )
         super().validate()
 
     def as_dict(self, *args, **kwargs):

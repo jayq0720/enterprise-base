@@ -120,7 +120,12 @@ class TestWecomLogin(FrappeTestCase):
                 user.db_set("enabled", 0, commit=True)
                 callback(start())
                 user.db_set("enabled", 1, commit=True)
-                for roles in ([], ["Employee", "EB X4"], ["Employee", "EB Integration"]):
+                for roles in (
+                    [],
+                    ["Employee", "EB X4"],
+                    ["Employee", "EB Integration"],
+                    ["Employee", "System Manager"],
+                ):
                     with patch.object(frappe, "get_roles", return_value=roles):
                         self.assertIsNone(login._employee_user("synthetic-member"))
                 with patch.object(login, "_get", return_value={"openid": "external"}):
