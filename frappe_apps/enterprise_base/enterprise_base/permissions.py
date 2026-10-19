@@ -7,11 +7,13 @@ import frappe
 from frappe.sessions import clear_sessions
 from hrms.overrides.employee_master import EmployeeMaster
 
+from enterprise_base.duties.tool_switches import FIELDS as TOOL_FIELDS
+
 PRIVILEGED = {"HR User", "HR Manager", "EB Integration", "EB X4"}
 # X4 只能按“=”精确查这几张表的这几个字段（只查列表，不取整条记录）
 X4_COLUMNS = {
     "Employee": {"name", "employee_name", "user_id", "wecom_userid", "designation"},
-    "Designation": {"name", "eb_responsibilities"},
+    "Designation": {"name", "eb_responsibilities", *TOOL_FIELDS},
 }
 X4_METHODS = {
     "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
