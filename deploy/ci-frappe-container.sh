@@ -52,4 +52,24 @@ PY
   bench --site "$site" execute enterprise_base.tests.probe.verify_http_contract
   echo "$site：真实 HTTP 认证、允许字段与越权拒绝通过。"
 done
+umask 077
+recovery_root=/home/frappe/frappe-bench/sites/.eb-recovery
+recovery_started=$SECONDS
+bench --site contract.local execute enterprise_base.tests.recovery_probe.seed
+bench --site contract.local backup --with-files --ignore-backup-conf --backup-path "$recovery_root" \
+  --backup-path-db "$recovery_root/database.sql.gz" --backup-path-files "$recovery_root/files.tar" \
+  --backup-path-private-files "$recovery_root/private-files.tar" --backup-path-conf "$recovery_root/site_config.json"
+# new-site 已存在时会失败；--force 只用于随即创建的空站点，不接触原两个测试站点。
+bench new-site recovery.local --db-root-password "$EB_TEST_PASSWORD" \
+  --admin-password "$EB_TEST_PASSWORD" --mariadb-user-host-login-scope '%'
+bench --site recovery.local set-config allow_tests true
+bench --site recovery.local restore "$recovery_root/database.sql.gz" --force \
+  --db-root-password "$EB_TEST_PASSWORD" --admin-password "$EB_TEST_PASSWORD" --with-public-files "$recovery_root/files.tar" \
+  --with-private-files "$recovery_root/private-files.tar"
+bench --site recovery.local execute enterprise_base.tests.recovery_probe.configure_target
+bench --site recovery.local migrate
+bench --site recovery.local execute enterprise_base.tests.recovery_probe.verify
+bench --site recovery.local execute enterprise_base.tests.probe.verify_http_contract
+rm -rf "$recovery_root"
+echo "Frappe 恢复演练耗时：$((SECONDS - recovery_started)) 秒（含合成数据准备、备份、建空站、恢复、迁移和核对）。"
 echo '真实 Frappe 测试、配置导出及第二空站点导入完成。'
