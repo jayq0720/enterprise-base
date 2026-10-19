@@ -1,4 +1,4 @@
-"""仅 CI 新站点：在安装 App 前模拟可空旧列，不操作已安装站点。"""
+"""仅 CI 临时站点：模拟旧列并核对安装、真实迁移及关闭值保持。"""
 
 import frappe
 
@@ -32,3 +32,20 @@ def verify_after_install():
         if not values or tuple(values) != (expected,) * len(FIELDS):
             raise AssertionError("岗位开关升级未保持空值/关闭/开启语义。")
     print("岗位开关升级：旧空值补1、关闭保留0、开启保留1通过。")
+
+
+def seed_before_migrate():
+    if (
+        frappe.local.site != "contract.local"
+        or not frappe.conf.allow_tests
+        or "enterprise_base" not in frappe.get_installed_apps()
+    ):
+        frappe.throw("只允许在已安装 App、启用测试的临时 contract.local 运行。")
+    verify_after_install()  # 必须是安装前造出的三条合成记录，先核对再改旧列。
+    columns = ", ".join(f"modify column `{field}` int null default null" for field in FIELDS)
+    frappe.db.sql_ddl(f"alter table `tabDesignation` {columns}")
+    assignments = ", ".join(f"`{field}`=null" for field in FIELDS)
+    frappe.db.sql(
+        f"update `tabDesignation` set {assignments} where name=%s", "EB Tools Legacy Unset"
+    )
+    frappe.db.commit()

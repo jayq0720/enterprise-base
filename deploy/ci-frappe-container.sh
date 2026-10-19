@@ -34,6 +34,14 @@ PY
     bench --site "$site" execute enterprise_base.tests.tool_switch_probe.verify_after_install
   fi
   bench --site "$site" execute frappe.db.set_single_value --args '["System Settings",{"language":"en","time_zone":"Asia/Shanghai","enable_telemetry":0}]'
+  if test "$site" = contract.local; then
+    bench --site "$site" execute enterprise_base.tests.tool_switch_probe.seed_before_migrate
+    for pass in 1 2; do
+      bench --site "$site" migrate
+      bench --site "$site" execute enterprise_base.tests.tool_switch_probe.verify_after_install
+    done
+    echo 'contract.local：两次原生迁移后空值补齐、关闭和开启值保留通过。'
+  fi
   # 官方 runner 仅在 CI 环境变量存在时才用退出码报告测试失败。
   CI=true bench --site "$site" run-tests --app enterprise_base --skip-test-records
   if test "$site" = contract.local; then
