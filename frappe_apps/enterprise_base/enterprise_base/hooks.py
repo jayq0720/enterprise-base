@@ -68,6 +68,7 @@ doc_events["Leave Application"] = {
     "before_cancel": "enterprise_base.leave_flow.validate",
     "before_update_after_submit": "enterprise_base.leave_flow.validate",
 }
+doc_events["ToDo"] = {"on_update": "enterprise_base.onboarding.complete_assigned_task"}
 doc_events["Version"] = {"before_insert": "enterprise_base.permissions.redact_version"}
 doc_events["User"] = {"on_update": "enterprise_base.permissions.hr_scope"}
 fixtures.extend(

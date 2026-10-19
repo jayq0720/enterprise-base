@@ -115,6 +115,37 @@ def generate(doc, method=None):
         pending("入职单未生成，请 HR 核对假日表和招聘配置后保存员工档案重试。")
 
 
+def complete_assigned_task(doc, method=None):
+    """负责人关掉自己的入职待办时，把对应任务标成完成。
+
+    只认本人关自己的待办，且任务属于已提交入职单里分给本人的活动；
+    HR 完成任务时原生会关掉待办，那时操作人不是负责人，不会重复处理。
+    """
+    before = doc.get_doc_before_save()
+    if (
+        doc.reference_type != "Task"
+        or doc.status != "Closed"
+        or not before
+        or before.status != "Open"
+        or doc.allocated_to != frappe.session.user
+    ):
+        return
+    onboarding = frappe.db.get_value(
+        "Employee Boarding Activity",
+        {"parenttype": "Employee Onboarding", "task": doc.reference_name, "user": doc.allocated_to},
+        "parent",
+    )
+    if not onboarding or frappe.db.get_value("Employee Onboarding", onboarding, "docstatus") != 1:
+        return
+    task = frappe.get_doc("Task", doc.reference_name, for_update=True)
+    if task.status in {"Completed", "Cancelled"}:
+        return
+    task.status = "Completed"
+    # 负责人对任务只有分享的读权限；这里只放行“完成自己这一项”，不放开编辑任务
+    task.flags.ignore_permissions = True
+    task.save()
+
+
 def pending(message):
     # 固定提示，不输出员工内容、招聘身份、模板正文或原始异常。
     frappe.msgprint(message, title="入职待办尚未生成", indicator="orange")
