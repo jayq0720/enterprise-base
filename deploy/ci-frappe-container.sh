@@ -14,7 +14,17 @@ for site in contract.local import.local; do
     --admin-password "$EB_TEST_PASSWORD" --mariadb-user-host-login-scope '%' --install-app erpnext
   for app in hrms wiki; do bench --site "$site" install-app "$app"; done
   bench --site "$site" set-config allow_tests true
-  bench --site "$site" execute enterprise_base.tests.tool_switch_probe.seed_before_install
+  ./env/bin/python - "$site" <<'PY'
+import sys
+import frappe
+from enterprise_base.tests.tool_switch_probe import seed_before_install
+frappe.init(site=sys.argv[1])
+frappe.connect()
+try:
+    seed_before_install()
+finally:
+    frappe.destroy()
+PY
   bench --site "$site" install-app enterprise_base
   bench --site "$site" execute enterprise_base.tests.tool_switch_probe.verify_after_install
   bench --site "$site" execute frappe.db.set_single_value --args '["System Settings",{"language":"en","time_zone":"Asia/Shanghai","enable_telemetry":0}]'
