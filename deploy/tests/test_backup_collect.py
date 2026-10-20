@@ -58,7 +58,9 @@ class CollectionTests(unittest.TestCase):
         return Collector("customer", run=docker, sleep=lambda _: None).collect(folder)
 
     def resumed(self, docker):
-        stopped = [c[-1] for c in docker.calls if c[0] == "stop"]
+        stops = [c for c in docker.calls if c[0] == "stop"]
+        self.assertEqual(len(stops), 1)  # 一次传入全部容器，由 Docker 并行停止
+        stopped = stops[0][3:]
         started = [c[-1] for c in docker.calls if c[0] == "start" and "-a" not in c]
         self.assertEqual(set(stopped), set(started))
         self.assertNotIn("/wechat", started)
