@@ -99,7 +99,7 @@ def configuration(path):
     if not 1 <= daily <= 365 or not 1 <= weekly <= 104:
         raise ValueError("保留周期无效")
     target = ROOT / (values.get("EB_BACKUP_DIR") or "data/backups")
-    if target.is_symlink():
+    if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("备份目录不能是链接")
     target = target.resolve()
     if target.is_relative_to(source.resolve()) or source.resolve().is_relative_to(target):
