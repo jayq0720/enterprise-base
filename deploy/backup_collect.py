@@ -127,6 +127,7 @@ class Collector:
                     image=item["Config"]["Image"], image_id=item["Image"]
                 )
         for key in (
+            ("", "caddy"),
             ("-hr", "backend"),
             ("-hr", "db"),
             ("-dify", "api"),
@@ -154,12 +155,16 @@ class Collector:
 
     @contextmanager
     def stopped(self):
-        attempted = []
+        # 先记下全部 ID：stop 部分成功后也必须尝试恢复。
+        attempted = [
+            item["Id"]
+            for (suffix, service), item in self.containers.items()
+            if service not in KEEP[suffix] and item["State"]["Running"]
+        ]
         try:
-            for (suffix, service), item in self.containers.items():
-                if service not in KEEP[suffix] and item["State"]["Running"]:
-                    attempted.append(item["Id"])  # stop 部分成功后也必须尝试恢复。
-                    self.call(service, ["stop", "--time", "60", item["Id"]])
+            if attempted:
+                # 部分上游镜像入口不转发 SIGTERM，要等满超时；一次传入让 Docker 并行停止。
+                self.call("停止服务", ["stop", "--time", "60", *attempted])
             yield
         finally:
             failed = False
