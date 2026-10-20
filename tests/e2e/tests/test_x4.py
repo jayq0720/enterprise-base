@@ -1,6 +1,6 @@
-"""X4 工具按会话令牌只查本人：岗位职责、假期、待我审批；不返回敏感字段。"""
+"""X4 工具按会话令牌只查本人：岗位职责、假期、待我审批；不返回敏感字段；岗位关掉的功能不能用。"""
 
-from e2e.clients import X4
+from e2e.clients import X4, Frappe
 from e2e.world import World
 
 from .conftest import assert_clean
@@ -39,3 +39,19 @@ def test_forged_token_rejected(x4: X4, world: World) -> None:
         "tools/call", {"name": "leave_balance", "arguments": {"session_token": world.a.wecom}}
     )
     assert "error" in forged["content"][0]["text"]
+
+
+def test_designation_switch_off(x4: X4, frappe: Frappe, world: World) -> None:
+    # HR 在岗位上关掉“查岗位职责”“查假期”，下一次调用就拒绝，同部门别的岗位不受影响
+    off = {"eb_tool_duties": 0, "eb_tool_leave_query": 0}
+    frappe.update("Designation", world.b.designation, off)
+    try:
+        for tool in ("my_responsibilities", "leave_balance", "my_leave_applications"):
+            out = x4.call(world.b.wecom, tool)
+            assert "没有开通" in out.get("error", ""), out
+            assert not {"responsibilities", "balances", "applications"} & out.keys()
+        assert "error" not in x4.call(world.b.wecom, "pending_my_approval")
+        assert "error" not in x4.call(world.a.wecom, "my_responsibilities")
+    finally:
+        frappe.update("Designation", world.b.designation, {k: 1 for k in off})
+    assert "error" not in x4.call(world.b.wecom, "my_responsibilities")
