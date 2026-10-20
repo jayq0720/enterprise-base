@@ -127,6 +127,7 @@ class Collector:
                     image=item["Config"]["Image"], image_id=item["Image"]
                 )
         for key in (
+            ("", "caddy"),
             ("-hr", "backend"),
             ("-hr", "db"),
             ("-dify", "api"),
