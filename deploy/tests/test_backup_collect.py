@@ -10,15 +10,18 @@ from backup_collect import LABEL, QDRANT, SITES, CollectionError, Collector
 
 class Docker:
     def __init__(self, failure=""):
-        self.calls, self.readers, self.failure = [], {}, failure
+        self.calls, self.readers = [], {}
+        self.failures = failure if isinstance(failure, tuple) else (failure,) * bool(failure)
         self.items = json.loads(Path(__file__).with_name("backup-containers.json").read_text())
 
     def __call__(self, args, output=None):
         args = args[1:]
         self.calls.append(args)
         effective = self.readers[args[2]] if args[:2] == ["start", "-a"] else args
-        if self.failure and any(self.failure in arg for arg in effective):
-            raise OSError("PRIVATE=must-not-leak")
+        for marker in self.failures:
+            if any(marker in arg for arg in effective):
+                # 清理失败用另一种错误类型，便于确认原错误没有被它盖掉。
+                raise (PermissionError if marker == "rmtree" else OSError)("PRIVATE=must-not-leak")
         if args[0] == "ps":
             project = args[-1].split("=")[-1]
             return "\n".join(
@@ -52,7 +55,7 @@ class Docker:
 
 class CollectionTests(unittest.TestCase):
     def execute(self, docker, folder):
-        return Collector("customer", run=docker).collect(folder)
+        return Collector("customer", run=docker, sleep=lambda _: None).collect(folder)
 
     def resumed(self, docker):
         stopped = [c[-1] for c in docker.calls if c[0] == "stop"]
@@ -74,6 +77,8 @@ class CollectionTests(unittest.TestCase):
                     "frappe.tar",
                     "sites.json",
                     "api.tar",
+                    "caddy.tar",
+                    "wechat.tar",
                     "plugin_daemon.tar",
                     "databases.json",
                     "postgres-globals.sql",
@@ -100,6 +105,25 @@ class CollectionTests(unittest.TestCase):
                     self.execute(docker, work)
                 self.assertNotIn("must-not-leak", str(caught.exception))
                 self.resumed(docker)
+
+    def test_original_error_survives_cleanup_failure(self):
+        with tempfile.TemporaryDirectory() as work:
+            docker = Docker(("--with-files", "rmtree"))
+            with self.assertRaisesRegex(CollectionError, "^backend:OSError$"):
+                self.execute(docker, work)
+            self.resumed(docker)
+            docker = Docker("rmtree")
+            with self.assertRaisesRegex(CollectionError, "^backend:PermissionError$"):
+                self.execute(docker, work)
+            self.resumed(docker)
+
+    def test_waits_until_restarted_services_are_healthy(self):
+        with tempfile.TemporaryDirectory() as work:
+            docker = Docker()
+            docker.items["-hr/backend"]["State"]["Health"] = {"Status": "starting"}
+            with self.assertRaisesRegex(CollectionError, "Unhealthy"):
+                self.execute(docker, work)
+            self.resumed(docker)
 
     def test_rejects_running_job_and_unsafe_destination_before_stopping(self):
         with tempfile.TemporaryDirectory() as work:

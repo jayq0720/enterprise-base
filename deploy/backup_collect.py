@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import subprocess
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -64,10 +65,10 @@ def command(args, output=None):
 
 
 class Collector:
-    def __init__(self, project, run=command):
+    def __init__(self, project, run=command, sleep=time.sleep):
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,62}", project):
             raise CollectionError("配置:ValueError")
-        self.project, self.run = project, run
+        self.project, self.run, self.sleep = project, run, sleep
         self.containers, self.images, self.networks = {}, {}, {}
 
     def call(self, component, args, output=None):
@@ -169,6 +170,22 @@ class Collector:
                     failed = True  # 某个启动失败不能阻断其它服务恢复。
             if failed:
                 raise CollectionError("恢复服务:StartFailed")
+            if attempted:
+                self.healthy(attempted)
+
+    def healthy(self, identities):
+        """docker start 不等依赖和健康检查；全部健康后才算恢复完成。"""
+        for _ in range(60):
+            records = json.loads(self.call("恢复服务", ["inspect", *identities]))
+            states = [record["State"] for record in records]
+            if any(not state["Running"] for state in states):
+                raise CollectionError("恢复服务:Exited")
+            if all(
+                state.get("Health", {}).get("Status", "healthy") == "healthy" for state in states
+            ):
+                return
+            self.sleep(5)
+        raise CollectionError("恢复服务:Unhealthy")
 
     def payload(self, folder, name, component, args):
         with (folder / name).open("xb") as output:
@@ -195,6 +212,22 @@ class Collector:
                     service,
                     ["cp", self.containers["-dify", service]["Id"] + ":" + path + "/.", "-"],
                 )
+            # 证书和企业微信会话不在数据库里；停写后一起复制，wechat 未启用时没有容器。
+            for suffix, service, path in (
+                ("", "caddy", "/data"),
+                ("", "wechat", "/app/data"),
+            ):
+                if (suffix, service) in self.containers:
+                    self.payload(
+                        folder,
+                        service + ".tar",
+                        service,
+                        [
+                            "cp",
+                            self.containers[suffix, service]["Id"] + ":" + path + "/.",
+                            "-",
+                        ],
+                    )
             with (folder / "qdrant.snapshot").open("xb") as output:
                 os.fchmod(output.fileno(), 0o600)
                 self.reader("-dify", "api", ["-c", QDRANT], output)
@@ -205,6 +238,7 @@ class Collector:
         if not sites or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s) for s in sites):
             raise CollectionError("Frappe:InvalidSites")
         work = "/home/frappe/frappe-bench/sites/.eb-backup-" + uuid4().hex
+        succeeded = False
         try:
             for index, site in enumerate(sites):
                 base = work + "/" + str(index)
@@ -234,9 +268,18 @@ class Collector:
                 "Frappe",
                 ["cp", self.containers["-hr", "backend"]["Id"] + ":" + work + "/.", "-"],
             )
+            succeeded = True
         finally:
-            cleanup = f"import os,shutil;p={work!r};os.path.exists(p) and shutil.rmtree(p)"
-            self.reader("-hr", "backend", ["-c", cleanup])
+            # 连同以前失败留下的明文副本一起删；备份已失败时保留原错误，不让清理错误盖掉它。
+            cleanup = (
+                "import glob,shutil;[shutil.rmtree(p) for p in "
+                "glob.glob('/home/frappe/frappe-bench/sites/.eb-backup-*')]"
+            )
+            try:
+                self.reader("-hr", "backend", ["-c", cleanup])
+            except CollectionError:
+                if succeeded:
+                    raise
 
     def postgres(self, folder):
         container = self.containers["-dify", "db_postgres"]["Id"]
