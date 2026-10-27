@@ -37,6 +37,7 @@ mkdir -p deploy/data
 docker builder prune -af
 docker save eb-frappe-contract:0.1.0 | gzip > deploy/data/ci-frappe.tar.gz
 fi
+uv run --python 3.12 python deploy/ci-frappe-storage.py
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
   -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh \
