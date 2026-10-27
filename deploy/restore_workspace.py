@@ -117,7 +117,7 @@ def create(repository, manifest, source, sites, project, destination, port, run=
     config = values(source / ".env")
     if config.get("EB_PROJECT") != manifest["project"]:
         raise ValueError("备份密钥配置与清单项目不一致")
-    primary = "hr." + config["EB_DOMAIN"]
+    primary = config.get("EB_RESTORE_PRIMARY_SITE") or "hr." + config["EB_DOMAIN"]
     if primary not in sites:
         if len(sites) != 1:
             raise ValueError("无法确定多个站点中的主站点")
@@ -154,6 +154,7 @@ def create(repository, manifest, source, sites, project, destination, port, run=
             EB_ADMIN_ALLOW_CIDRS="127.0.0.1/32",
             EB_WECOM_CALLBACK_MODE="bridge",
             EB_BACKUP_DIR="data/backups",
+            EB_RESTORE_PRIMARY_SITE=primary,
         )
         for key in ("EB_FRAPPE_DB_PASSWORD", "EB_FRAPPE_ADMIN_PASSWORD", "DB_PASSWORD"):
             config[key] = secrets.token_urlsafe(32)

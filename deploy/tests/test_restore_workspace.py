@@ -125,6 +125,7 @@ class WorkspaceTests(unittest.TestCase):
         )
         self.assertNotIn(result["DB_PASSWORD"], {"old-db", "host-password"})
         self.assertNotEqual(result["EB_FRAPPE_DB_PASSWORD"], "old-root")
+        self.assertEqual(result["EB_RESTORE_PRIMARY_SITE"], primary)
         self.assertEqual((deploy / "secrets/binary.pfx").read_bytes(), b"\xff\x00")
         self.assertTrue(
             all("DB_PASSWORD" not in env and "COMPOSE_PROJECT_NAME" not in env for env in self.envs)
