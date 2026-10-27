@@ -47,3 +47,4 @@ tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/
+uv run --python 3.12 python deploy/ci-frappe-qdrant.py
