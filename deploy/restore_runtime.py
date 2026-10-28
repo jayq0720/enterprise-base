@@ -80,6 +80,8 @@ class Target:
             "docker",
             "ps",
             "-aq",
+            # PostgreSQL/Qdrant 恢复要求 64 位完整容器 ID。
+            "--no-trunc",
             "--filter",
             "label=com.docker.compose.project=" + self.models[stack]["name"],
             "--filter",
@@ -161,7 +163,8 @@ class Target:
                     backend,
                     "chown",
                     "-R",
-                    "frappe:frappe",
+                    # 镜像里 frappe 用户的主组是 root，没有 frappe 组。
+                    "frappe:",
                     folder,
                 ]
             )
@@ -189,7 +192,7 @@ class Target:
             succeeded = True
         finally:
             try:
-                self.call(["docker", "exec", backend, "rm", "-rf", folder])
+                self.call(["docker", "exec", "--user", "root", backend, "rm", "-rf", folder])
             except Exception:
                 try:
                     self.call(["docker", "rm", "-f", backend])

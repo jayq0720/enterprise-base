@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 import restore_runtime as rt
 
+CONTAINER = "c" * 64
+
 
 class RuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -60,7 +62,8 @@ class RuntimeTests(unittest.TestCase):
         self.calls.append((args, source, env))
         if args[1] == "ps":
             self.assertTrue(any(rt.MARK + "=" + self.target.operation in a for a in args))
-            return b"target-id"
+            self.assertIn("--no-trunc", args)
+            return CONTAINER.encode()
         return b""
 
     def test_data_restores_before_app_start_and_no_tasks_or_wechat_start(self):
@@ -89,10 +92,16 @@ class RuntimeTests(unittest.TestCase):
             )
         )
         self.assertIn(
+            ["docker", "exec", "--user", "root", CONTAINER, "chown", "-R", "frappe:"],
+            [c[0][:8] for c in self.calls],
+        )
+        self.assertIn(
             [
                 "docker",
                 "exec",
-                "target-id",
+                "--user",
+                "root",
+                CONTAINER,
                 "rm",
                 "-rf",
                 "/tmp/eb-restore-" + self.target.operation,
@@ -113,6 +122,6 @@ class RuntimeTests(unittest.TestCase):
         self.target.run, self.target.step = failed, "Frappe"
         with self.assertRaisesRegex(rt.CollectionError, "^Frappe:OSError$"):
             self.target.frappe(self.root, ["hr.source"], "hr.source", 18080)
-        self.assertIn(["docker", "rm", "-f", "target-id"], [c[0] for c in self.calls])
+        self.assertIn(["docker", "rm", "-f", CONTAINER], [c[0] for c in self.calls])
         self.assertEqual(self.target.stop(), [])
         self.assertEqual(sum(c[0][1] == "stop" for c in self.calls), 3)
