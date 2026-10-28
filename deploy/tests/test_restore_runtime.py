@@ -109,6 +109,18 @@ class RuntimeTests(unittest.TestCase):
             [c[0] for c in self.calls],
         )
 
+    def test_configurator_uses_backend_image_even_if_backup_recorded_old_one(self):
+        self.manifest["images"]["-hr/configurator"] = {"image_id": "sha256:" + "b" * 64}
+        with ExitStack() as patches:
+            for module in (rt.pg, rt.qd, rt.storage):
+                patches.enter_context(patch.object(module, "restore"))
+            patches.enter_context(patch.object(rt, "verify"))
+            self.target.restore(self.manifest, self.root, ["hr.source"], "hr.source", 18080)
+        model = json.loads((self.root / "data/restore-hr.json").read_text())
+        configurator = model["services"]["configurator"]
+        self.assertEqual(configurator["image"], "sha256:" + "a" * 64)
+        self.assertEqual(configurator["pull_policy"], "never")
+
     def test_native_failure_and_cleanup_failure_preserve_error_and_stop_all_projects(self):
         original = self.target.run
 

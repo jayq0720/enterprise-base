@@ -201,12 +201,15 @@ class Target:
             selected[stack] = [
                 n for n in self.models[stack]["services"] if suffix + "/" + n in manifest["images"]
             ]
-            if stack == "hr" and "configurator" not in selected[stack]:
+            if stack == "hr":
+                # configurator 按镜像里的 apps 目录生成 apps.txt，必须和 backend 同一镜像；
+                # 备份记录的 configurator 是一次性容器，可能还停在 backend 升级前的旧镜像上。
                 self.models[stack]["services"]["configurator"].update(
                     image=manifest["images"]["-hr/backend"]["image_id"], pull_policy="never"
                 )
                 ws.write(self.deploy / "data/restore-hr.json", json.dumps(self.models[stack]))
-                selected[stack].append("configurator")
+                if "configurator" not in selected[stack]:
+                    selected[stack].append("configurator")
             self.compose(
                 stack,
                 "up",
