@@ -82,6 +82,7 @@ class StateTests(unittest.TestCase):
         self.assertTrue(state.mark(path, "failed")["restore_database"])
         self.assertTrue(state.mark(path, "rollback-failed")["restore_database"])
         self.assertEqual(record["backup"], "before.tar.age")
+        self.assertEqual(record["running_services"], ["-hr/backend"])
         (path.parent / record["backup"]).write_bytes(b"tampered")
         with self.assertRaises(ValueError):
             state.load(path)
@@ -108,6 +109,9 @@ class StateTests(unittest.TestCase):
         self.git("checkout", "--detach", self.before)
         with self.assertRaises(subprocess.CalledProcessError):
             state.plan(self.repo, preview, self.env)
+        self.git("checkout", "--detach", self.target)
+        with self.assertRaises(subprocess.CalledProcessError):
+            state.plan(self.repo, self.before, self.env)
 
     def test_failed_atomic_write_keeps_previous_record(self):
         path = state.create(self.deploy, self.plan(), self.archive, {})

@@ -64,6 +64,7 @@ def plan(repository, revision, env, run=command, main_ref="refs/remotes/origin/m
         raise ValueError("目标提交必须不同于当前提交")
     run([*git, "merge-base", "--is-ancestor", revision, main_ref])
     run([*git, "merge-base", "--is-ancestor", current, main_ref])
+    run([*git, "merge-base", "--is-ancestor", current, revision])
 
     def read(commit, name):
         return run([*git, "show", commit + ":deploy/" + name]).decode()
@@ -127,7 +128,7 @@ def write(path, record):
             temporary.unlink(missing_ok=True)
 
 
-def create(deploy, release_plan, archive, running_images):
+def create(deploy, release_plan, archive, running_images, running_services=None):
     """操作锁内调用；加密备份另存，不会被每日备份保留策略删除。"""
     deploy, archive = Path(deploy), Path(archive)
     private(archive)
@@ -157,6 +158,9 @@ def create(deploy, release_plan, archive, running_images):
         if not re.fullmatch(r"sha256:[a-f0-9]{64}", identity):
             raise ValueError("运行镜像 ID 无效")
         sanitized[service] = identity
+    active = sorted(running_services if running_services is not None else sanitized)
+    if len(active) != len(set(active)) or not set(active) <= sanitized.keys():
+        raise ValueError("运行服务列表无效")
     root = deploy / "data/releases"
     if any(p.is_symlink() for p in (root, *root.parents)):
         raise ValueError("发布目录不能是链接")
@@ -181,6 +185,7 @@ def create(deploy, release_plan, archive, running_images):
             backup="before.tar.age",
             backup_sha256=digest,
             running_images=sanitized,
+            running_services=active,
             phase="backed-up",
             restore_database=False,
         )
