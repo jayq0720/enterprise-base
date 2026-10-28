@@ -24,6 +24,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_storage.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_guard.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_frappe.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_restore_frappe_existing.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_qdrant.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_workspace.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_runtime.py'
