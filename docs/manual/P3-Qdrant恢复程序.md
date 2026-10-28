@@ -1,6 +1,6 @@
 # Qdrant 原生恢复程序（P3-G2）
 
-`deploy/restore_qdrant.py` 是完整恢复入口的内部模块，须在 `restore_guard.prepared` 完成整包校验、新项目隔离并持锁后调用。只支持备份收集程序已确认的单节点全存储快照，不用于分布式集群；统一 `make restore` 仍待接入。
+`deploy/restore_qdrant.py` 是完整恢复入口的内部模块，须在 `restore_guard.prepared` 完成整包校验、新项目隔离并持锁后调用。只支持备份收集程序已确认的单节点全存储快照，不用于分布式集群；统一 `make restore` 操作见[完整恢复](P3-完整恢复.md)。
 
 程序复核目标应用已停写、Qdrant 容器停止、镜像 ID 一致、数据命名卷属于新项目且完全为空，不接受源项目、旧卷、绑定宿主目录或自定义非 root 运行用户。使用同一锁定版本官方镜像及原生 `--storage-snapshot`，不传 `--force-snapshot`。原容器保持停止，恢复由独立临时容器完成；它无网络、不加载业务密钥、关闭遥测与容器日志。
 

@@ -73,7 +73,7 @@ make status
 ```
 服务器实际域名不同则替换 curl URL。第一次启动后创建一个测试知识库和测试 Frappe 记录；重启后核对仍存在。记录开始/结束北京时间、版本、两次状态摘要、两个 HTTP 状态码及记录是否保留，交 JQ/Claude 复核。不要贴 `docker compose config` 的完整输出、原始日志或 `docker inspect`。启动成功摘要由 JQ 执行后补充，当前未勾选验证清单 1.1/1.4/6.1；无岗位拒绝、fixtures 空库导入在 G3/G4 验证，当前没有新增员工权限接口或 fixtures。
 
-三套 Compose 的项目名分别是 `${EB_PROJECT}`、`${EB_PROJECT}-dify`、`${EB_PROJECT}-hr`，数据库/向量/附件/队列/证书均用命名卷；sandbox conf 是只读配置挂载。`deploy/data/` 是可重新生成的上游配置，`deploy/secrets/` 需随备份加密保存；正常重启不修改项目名，不运行 `down -v`。本任务不包含自动备份或升级，升级时先备份数据库、文件卷和密钥，固定新版本，在独立测试项目完整验证后再迁移。
+三套 Compose 的项目名分别是 `${EB_PROJECT}`、`${EB_PROJECT}-dify`、`${EB_PROJECT}-hr`，数据库/向量/附件/队列/证书均用命名卷；sandbox conf 是只读配置挂载。`deploy/data/` 是可重新生成的上游配置，`deploy/secrets/` 需随备份加密保存；正常重启不修改项目名，不运行 `down -v`。每日加密备份及定时安装见[每日备份](../docs/manual/P3-每日备份.md)，`make restore` 隔离恢复见[完整恢复](../docs/manual/P3-完整恢复.md)。正式覆盖仍未提供；升级时先备份数据库、文件卷和密钥，固定新版本，在独立测试项目完整验证后再迁移。
 
 ## 当前验证边界
 开发环境没有 Docker Engine 和服务器凭据；镜像构建、干净机器 30 分钟目标、登录、持久化、真实企业微信回调均等待上述服务器实测。CI 自动运行 `make verify`，在临时目录检查完整三套配置及部署约束，并用固定版 Caddy 在随机回环端口短暂验证允许/403/伪造请求头行为，测试后端仅返回固定响应，不访问业务服务。校验不读取或覆盖已有运行密钥；`make config` 用于检查当前实际部署配置。G1 通过后按 G2 验证三个官方模型插件，再按 G3/G4 配置组织、审批与 `wecom_userid` 并导出 fixtures；结果不能用这些检查替代。

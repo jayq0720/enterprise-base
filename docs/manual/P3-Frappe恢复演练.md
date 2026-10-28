@@ -1,6 +1,6 @@
 # Frappe 备份与恢复演练（P3-G2）
 
-本篇记录任务的原生 Frappe CI 演练；整套加密备份、`make backup/restore`、保留策略和定时任务在后续 PR 接入。不要把 CI 的临时目录或测试脚本用于生产恢复。
+本篇记录任务的原生 Frappe CI 演练；`make backup`、保留策略及定时安装见[每日备份](P3-每日备份.md)，`make restore` 见[完整恢复](P3-完整恢复.md)。不要把 CI 的临时目录或测试脚本用于生产恢复。
 
 `frappe-contract` 先完成两个空站点的权限测试和配置导入，再创建合成员工、岗位、请假单和两份公开/私有附件。使用固定 Frappe v15.123.1 的原生 `bench backup --with-files --ignore-backup-conf`，数据库、公开文件、私有文件及站点配置分别保存到仅当前用户可访问的临时目录。
 

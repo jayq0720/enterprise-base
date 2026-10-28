@@ -6,7 +6,7 @@ import os
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,7 +66,10 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(self.calls[2], ["bench", "--site", "recovery.test", "migrate"])
         with self.assertRaises(ValueError):
             self.restore()
-        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(
+            self.calls[3][-3:], ["set-admin-password", "admin-secret", "--logout-all-sessions"]
+        )
+        self.assertEqual(len(self.calls), 4)
 
     def test_preflight_rejects_unsafe_site_path_link_and_public_secret(self):
         for site in ("../live", "--site", "all;exit", "all", ""):
@@ -94,6 +97,8 @@ class NativeTests(unittest.TestCase):
         def failed(args):
             self.bench(args)
             if "restore" in args:
+                for name in ("files.tar", "private-files.tar"):
+                    (self.config.parent / name).write_bytes(b"synthetic plaintext")
                 raise subprocess.CalledProcessError(1, args, stderr=b"private employee")
 
         output = io.StringIO()
@@ -101,6 +106,7 @@ class NativeTests(unittest.TestCase):
             self.restore(failed)
         self.assertEqual(str(error.exception), "frappe:restore:CalledProcessError")
         self.assertEqual(len(self.calls), 2)
+        self.assertFalse(list(self.config.parent.glob("*.tar")))
         with patch.object(native, "restore", side_effect=error.exception), redirect_stdout(output):
             with (
                 patch.object(native.sys, "argv", ["restore_frappe.py", "site", "path"]),
@@ -112,6 +118,25 @@ class NativeTests(unittest.TestCase):
             ):
                 self.assertEqual(native.main(), 1)
         self.assertEqual(output.getvalue(), "frappe:restore:CalledProcessError\n")
+
+    def test_cleanup_error_does_not_replace_native_failure(self):
+        unlink = Path.unlink
+
+        def cleanup(path, **kwargs):
+            if path.name == "files.tar":
+                raise PermissionError("synthetic private content")
+            return unlink(path, **kwargs)
+
+        def failed(args):
+            self.bench(args)
+            if "restore" in args:
+                raise OSError("original private content")
+
+        output = io.StringIO()
+        with patch.object(Path, "unlink", cleanup), redirect_stderr(output):
+            with self.assertRaisesRegex(native.RestoreError, "^frappe:restore:OSError$"):
+                self.restore(failed)
+        self.assertEqual(output.getvalue(), "Frappe:附件暂存清理失败，需人工清理\n")
 
 
 if __name__ == "__main__":

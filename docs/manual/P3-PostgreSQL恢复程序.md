@@ -1,6 +1,6 @@
 # PostgreSQL 原生恢复程序（P3-G2）
 
-`deploy/restore_postgres.py` 是完整恢复入口的内部模块，暂不提供独立操作命令。调用方必须先用 `restore_guard.prepared` 完成整包解密、SHA256 校验、新项目检查，并在同一独占锁中建立隔离目标，再调用本模块；这部分不代表 `make restore` 全套入口已完成。
+`deploy/restore_postgres.py` 是完整恢复入口的内部模块，暂不提供独立操作命令。调用方必须先用 `restore_guard.prepared` 完成整包解密、SHA256 校验、新项目检查，并在同一独占锁中建立隔离目标，再调用本模块；统一 `make restore` 操作见[完整恢复](P3-完整恢复.md)，单独执行此模块不代表整套恢复通过。
 
 程序再次核对新旧三组 Compose 项目名不重叠、所有应用与临时任务已停写，目标 PostgreSQL 容器标签、健康状态、实际镜像 ID 与备份一致，数据命名卷属于新项目。来源项目或共享旧卷一律拒绝。Qdrant 的快照恢复由后续步骤处理，此模块不会停止或启动任何服务。
 

@@ -67,8 +67,21 @@ for site in recovery.local recovery-enc.local; do
   # 与收集程序一致，取回首次加密备份完成后才生成的密钥。
   cp sites/contract.local/site_config.json "$recovery_root/site_config.json"
   # 原生 CI 直接调用实际恢复程序，不另外复制解密密钥以免掩盖程序缺陷。
-  EB_RESTORE_DB_ROOT_PASSWORD="$EB_TEST_PASSWORD" EB_RESTORE_ADMIN_PASSWORD="$EB_TEST_PASSWORD" \
+  EB_RESTORE_ADMIN_PASSWORD=$(./env/bin/python -c 'import secrets; print(secrets.token_urlsafe(32))')
+  export EB_RESTORE_ADMIN_PASSWORD
+  EB_RESTORE_DB_ROOT_PASSWORD="$EB_TEST_PASSWORD" \
     ./env/bin/python /workspace/deploy/restore_frappe.py "$site" "$recovery_root"
+  ./env/bin/python - "$site" <<'PY'
+import os, sys, frappe
+from frappe.utils.password import check_password
+os.chdir("sites")
+frappe.init(site=sys.argv[1])
+frappe.connect()
+try:
+    assert check_password("Administrator", os.environ["EB_RESTORE_ADMIN_PASSWORD"]) == "Administrator"
+finally:
+    frappe.destroy()
+PY
   bench --site "$site" set-config allow_tests true
   bench --site "$site" execute enterprise_base.tests.recovery_probe.verify
   bench --site "$site" execute enterprise_base.tests.probe.verify_http_contract

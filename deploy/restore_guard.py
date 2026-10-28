@@ -17,7 +17,7 @@ SITE_FILES = {"database.sql.gz", "files.tar", "private-files.tar", "site_config.
 
 
 @contextmanager
-def prepared(archive, identity, project, directory, run=command):
+def prepared(archive, identity, project, directory, run=command, on_error=None):
     """持有操作锁直至调用方完成；任何退出路径清理解密内容。"""
     with backup.operation(), backup.cancellation() as check:
         backup.private(Path(identity))
@@ -37,8 +37,13 @@ def prepared(archive, identity, project, directory, run=command):
                 ):
                     raise ValueError("站点配置不是对象")
             check()
-            yield manifest, stage, sites, databases
-            check()
+            try:
+                yield manifest, stage, sites, databases
+                check()
+            except BaseException:
+                if on_error:
+                    on_error()
+                raise
 
 
 def names(value, pattern):
