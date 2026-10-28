@@ -109,6 +109,20 @@ class EntryTests(unittest.TestCase):
             self.assertEqual(entry.main(), 1)
         self.assertEqual(output.getvalue(), "恢复:失败:ValueError\n")
 
+    def test_staging_cleanup_error_stops_target_before_unlock(self):
+        cleanup = entry.guard.tempfile.TemporaryDirectory.cleanup
+
+        def failed(directory):
+            cleanup(directory)
+            raise OSError("synthetic private content")
+
+        with patch.object(entry.guard.tempfile.TemporaryDirectory, "cleanup", failed):
+            with self.assertRaises(OSError):
+                entry.restore(self.archive, self.identity, "recovery-cleanup", 18080)
+        self.target.stop.assert_called_once()
+        result = json.loads((self.target.deploy / "data/restore-result.json").read_text())
+        self.assertEqual(result["state"], "failed")
+
     def test_real_http_ping_redirect_and_fail_closed(self):
         requests = []
 
