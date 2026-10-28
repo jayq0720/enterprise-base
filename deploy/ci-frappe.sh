@@ -37,10 +37,15 @@ mkdir -p deploy/data
 docker builder prune -af
 docker save eb-frappe-contract:0.1.0 | gzip > deploy/data/ci-frappe.tar.gz
 fi
+docker tag eb-frappe-contract:0.1.0 enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0
+docker build -f deploy/Frappe.Containerfile -t eb-frappe-app-contract:0.1.0 \
+  frappe_apps/enterprise_base >/tmp/eb-frappe-app-build.log 2>&1 || {
+    tail -n 60 /tmp/eb-frappe-app-build.log; exit 1;
+  }
 uv run --python 3.12 python deploy/ci-frappe-storage.py
 docker run --name eb-frappe --network eb-contract --entrypoint bash \
   -e EB_TEST_PASSWORD="$password" -e EB_SYNC_WEBHOOK_SECRET="$webhook_secret" \
-  -v "$PWD:/workspace:ro" eb-frappe-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh \
+  -v "$PWD:/workspace:ro" eb-frappe-app-contract:0.1.0 /workspace/deploy/ci-frappe-container.sh \
   >/tmp/eb-frappe-test.log 2>&1 || {
     tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 300; exit 1;
   }
