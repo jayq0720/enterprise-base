@@ -17,9 +17,19 @@ SITE_FILES = {"database.sql.gz", "files.tar", "private-files.tar", "site_config.
 
 
 @contextmanager
+def failure(on_error):
+    try:
+        yield
+    except BaseException:
+        if on_error:
+            on_error()
+        raise
+
+
+@contextmanager
 def prepared(archive, identity, project, directory, run=command, on_error=None):
     """持有操作锁直至调用方完成；任何退出路径清理解密内容。"""
-    with backup.operation(), backup.cancellation() as check:
+    with backup.operation(), backup.cancellation() as check, failure(on_error):
         backup.private(Path(identity))
         backup.private(Path(archive))
         with tempfile.TemporaryDirectory(
@@ -37,13 +47,8 @@ def prepared(archive, identity, project, directory, run=command, on_error=None):
                 ):
                     raise ValueError("站点配置不是对象")
             check()
-            try:
-                yield manifest, stage, sites, databases
-                check()
-            except BaseException:
-                if on_error:
-                    on_error()
-                raise
+            yield manifest, stage, sites, databases
+            check()
 
 
 def names(value, pattern):
