@@ -13,11 +13,16 @@ from restore_guard import names
 PSQL = 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -h /var/run/postgresql -At'
 
 
-def command(args, source=None):
+def command(args, source=None, env=None):
     if source is not None:
         with Path(source).open("rb") as stream:
             return subprocess.run(
-                args, stdin=stream, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True
+                args,
+                stdin=stream,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                env=env,
             ).stdout
     return subprocess.run(
         args,
@@ -25,6 +30,7 @@ def command(args, source=None):
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         check=True,
+        env=env,
     ).stdout
 
 
