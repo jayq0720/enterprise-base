@@ -179,12 +179,6 @@ class Target:
                     ],
                     env=env,
                 )
-                reset = (
-                    "import os,sys;os.execvp('bench',['bench','--site',sys.argv[1],"
-                    "'set-admin-password',os.environ['EB_RESTORE_ADMIN_PASSWORD'],"
-                    "'--logout-all-sessions'])"
-                )
-                self.call([*credentialed, "env/bin/python", "-c", reset, site], env=env)
             url = f"http://hr.{config['EB_DOMAIN']}:{port}"
             self.call(
                 [*prefix, backend, "bench", "--site", primary, "set-config", "host_name", url]
@@ -260,15 +254,17 @@ def verify(port, domain):
                     connection.request("GET", path, headers={"Host": host + "." + domain})
                     response = connection.getresponse()
                     if host == "hr":
-                        assert (
+                        healthy = (
                             response.status == 200
                             and json.loads(response.read(65536))["message"] == "pong"
                         )
                     else:
-                        assert response.status in (200, 301, 302, 303, 307, 308)
+                        healthy = response.status in (200, 301, 302, 303, 307, 308)
+                    if not healthy:
+                        raise ValueError("HTTP 响应不健康")
                 finally:
                     connection.close()
             return
-        except (OSError, http.client.HTTPException, ValueError, KeyError, AssertionError):
+        except (OSError, http.client.HTTPException, ValueError, KeyError):
             time.sleep(5)
     raise CollectionError("HTTP:Unhealthy")

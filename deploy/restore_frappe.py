@@ -134,8 +134,29 @@ def restore(site, source, root_password, admin_password, run=command):
             settings(config, site_settings(original, current))
             step = "migrate"
             run(["bench", "--site", site, "migrate"])
+            step = "administrator"
+            run(
+                [
+                    "bench",
+                    "--site",
+                    site,
+                    "set-admin-password",
+                    admin_password,
+                    "--logout-all-sessions",
+                ]
+            )
         except Exception as error:
             raise RestoreError(f"frappe:{step}:{type(error).__name__}") from None
+        finally:
+            # 原生附件解包失败可能把输入 tar 留在站点根目录。
+            failed = sys.exception() is not None
+            try:
+                for name in ("files.tar", "private-files.tar"):
+                    (target / name).unlink(missing_ok=True)
+            except OSError as error:
+                if not failed:
+                    raise RestoreError(f"frappe:cleanup:{type(error).__name__}") from None
+                print("Frappe:附件暂存清理失败，需人工清理", file=sys.stderr)
 
 
 def main():

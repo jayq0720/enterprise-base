@@ -27,6 +27,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_qdrant.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_workspace.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_runtime.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_restore_entry.py'
 build: prepare
 	$(DOCKER) build --platform linux/amd64 -f data/frappe/images/custom/Containerfile --secret id=apps_json,src=apps.lock.json --build-arg FRAPPE_BRANCH=v15.123.1 --build-arg PYTHON_VERSION=3.12.12 --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0 data/frappe
 	$(DOCKER) build -f Frappe.Containerfile -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0 ../frappe_apps/enterprise_base
@@ -66,3 +67,9 @@ hr-assistant: prepare
 .PHONY: backup
 backup:
 	@$(PYTHON) backup.py "$(ENV)"
+
+.PHONY: restore
+RESTORE_PROJECT ?=
+RESTORE_PORT ?= 18080
+restore:
+	@$(PYTHON) restore.py --backup "$(BACKUP)" --identity "$(IDENTITY)" --project "$(RESTORE_PROJECT)" --port "$(RESTORE_PORT)"
