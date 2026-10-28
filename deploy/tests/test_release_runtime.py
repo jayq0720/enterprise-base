@@ -106,6 +106,13 @@ class RuntimeTests(unittest.TestCase):
         mark = self.calls.index(["migration-mark"])
         x4 = next(i for i, c in enumerate(self.calls) if "up" in c and "frappe-mcp" in c)
         dify = next(i for i, c in enumerate(self.calls) if "up" in c and "api" in c)
+        stops = [i for i, c in enumerate(self.calls) if "stop" in c]
+        stopped = {n for i in stops for n in self.calls[i]}
+        self.assertTrue(stops and max(stops) < migration)
+        self.assertTrue(
+            {"caddy", "frontend", "scheduler", "frappe-mcp", "api", "worker"} <= stopped
+        )
+        self.assertFalse({"db", "redis-queue", "db_postgres", "qdrant"} & stopped)
         self.assertLess(mark, migration)
         self.assertLess(migration, dify)
         self.assertLess(dify, x4)

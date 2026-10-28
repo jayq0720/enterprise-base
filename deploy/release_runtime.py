@@ -96,6 +96,14 @@ class Runtime(Target):
         super().__init__(deploy, project, run, prefix="release")
 
     def apply(self, migrate):
+        # 先停入口和全部应用层；迁移期间不能再有旧代码写库或跑后台任务。
+        self.step = "停止应用"
+        for stack, suffix in (("edge", ""), ("hr", "-hr"), ("dify", "-dify")):
+            names = [
+                n for n in self.selected[stack] if n not in KEEP[suffix] and n != "configurator"
+            ]
+            if names:
+                self.compose(stack, "stop", *names)
         self.step = "数据库启动"
         self.start("hr", ["db", "redis-cache", "redis-queue"])
         self.start("dify", ["db_postgres", "redis", "qdrant"])
