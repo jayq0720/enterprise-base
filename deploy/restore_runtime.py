@@ -33,11 +33,14 @@ HOLD = {
 
 
 class Target:
-    def __init__(self, deploy, project, run=pg.command):
+    def __init__(self, deploy, project, run=pg.command, prefix="restore"):
         self.deploy, self.project, self.run = Path(deploy), project, run
+        if prefix not in {"restore", "release"}:
+            raise ValueError("配置类型无效")
+        self.prefix = prefix
         self.operation, self.step = uuid4().hex, "准备"
         self.models = {
-            s: json.loads((self.deploy / f"data/restore-{s}.json").read_text())
+            s: json.loads((self.deploy / f"data/{prefix}-{s}.json").read_text())
             for s in ("edge", "dify", "hr")
         }
         keys = set(ws.values(self.deploy / "secrets/.env")) | set(
@@ -49,7 +52,7 @@ class Target:
         for stack, model in self.models.items():
             for service in model["services"].values():
                 service.setdefault("labels", {})[MARK] = self.operation
-            ws.write(self.deploy / f"data/restore-{stack}.json", json.dumps(model))
+            ws.write(self.deploy / f"data/{prefix}-{stack}.json", json.dumps(model))
 
     def call(self, args, source=None, **kwargs):
         try:
@@ -67,7 +70,7 @@ class Target:
                 "--env-file",
                 str(self.deploy / "secrets/.env"),
                 "-f",
-                str(self.deploy / f"data/restore-{stack}.json"),
+                str(self.deploy / f"data/{self.prefix}-{stack}.json"),
                 "--profile",
                 "*",
                 *args,
