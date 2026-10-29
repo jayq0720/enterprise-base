@@ -87,6 +87,24 @@ PY
   bench --site "$site" execute enterprise_base.tests.recovery_probe.verify
   bench --site "$site" execute enterprise_base.tests.probe.verify_http_contract
 done
+./env/bin/python - <<'PY'
+import os, pathlib, frappe
+os.chdir("sites")
+frappe.init(site="recovery-enc.local")
+frappe.connect()
+try:
+    frappe.db.set_value("Designation", "EB Recovery Position", "eb_tool_leave_apply", 1)
+    frappe.get_doc(dict(doctype="Designation", designation_name="EB Rollback Extra")).insert()
+    frappe.db.commit()
+    pathlib.Path("recovery-enc.local/public/files/post-release.txt").write_text("synthetic extra")
+finally:
+    frappe.destroy()
+PY
+EB_RESTORE_DB_ROOT_PASSWORD="$EB_TEST_PASSWORD" EB_RESTORE_EXISTING_APPROVED=recovery-enc.local \
+  ./env/bin/python /workspace/deploy/restore_frappe_existing.py recovery-enc.local "$recovery_root"
+test ! -e sites/recovery-enc.local/public/files/post-release.txt
+bench --site recovery-enc.local execute enterprise_base.tests.recovery_probe.verify
+echo 'Frappe 已有站点回滚：发布后新增记录和附件已移除，原数据、附件及独立数据库身份恢复通过。'
 rm -rf "$recovery_root"
 echo "Frappe 恢复演练耗时：$((SECONDS - recovery_started)) 秒（含合成数据准备、备份、建空站、恢复、迁移和核对）。"
 echo '真实 Frappe 测试、配置导出及第二空站点导入完成。'
