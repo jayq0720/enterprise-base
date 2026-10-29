@@ -34,7 +34,7 @@ def command(args, source=None, env=None):
     ).stdout
 
 
-def target(project, manifest, container, run):
+def target(project, manifest, container, run, *, existing=False):
     """复核项目标签、挂载卷归属、精确镜像和所有应用已停写。"""
     source = manifest["project"]
     if not all(
@@ -42,7 +42,9 @@ def target(project, manifest, container, run):
         for p in (project, source)
     ):
         raise ValueError("项目名无效")
-    if {project + s for s in KEEP} & {source + s for s in KEEP}:
+    if existing and project != source:
+        raise ValueError("覆盖恢复的备份必须来自当前项目")
+    if not existing and {project + s for s in KEEP} & {source + s for s in KEEP}:
         raise ValueError("不能写入来源项目")
     if not re.fullmatch(r"[a-f0-9]{64}", container):
         raise ValueError("需要完整目标容器 ID")

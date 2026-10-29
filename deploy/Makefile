@@ -21,6 +21,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_collect.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_entry.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_postgres.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_restore_postgres_existing.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_storage.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_guard.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_frappe.py'
