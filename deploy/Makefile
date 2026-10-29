@@ -35,6 +35,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_entry.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_release_runtime.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_release_controller.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_release_cli.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_release_state.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_health_services.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_health_entry.py'
@@ -87,3 +88,11 @@ RESTORE_PROJECT ?=
 RESTORE_PORT ?= 18080
 restore:
 	@$(PYTHON) restore.py --backup "$(BACKUP)" --identity "$(IDENTITY)" --project "$(RESTORE_PROJECT)" --port "$(RESTORE_PORT)"
+
+.PHONY: release rollback
+RELEASE_RECORD ?=
+RESTORE_DATA ?= 0
+release:
+	@$(PYTHON) release_cli.py release --env "$(ENV)" --revision "$(REVISION)"
+rollback:
+	@$(PYTHON) release_cli.py rollback --env "$(ENV)" --record "$(RELEASE_RECORD)" --identity "$(IDENTITY)" $(if $(filter 1,$(RESTORE_DATA)),--restore-data,)

@@ -121,3 +121,31 @@ class ControllerTests(unittest.TestCase):
         with redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
             core.rollback(record, "offline", True)
         self.runtime.stop.assert_not_called()
+
+    def test_failed_data_restore_keeps_record_and_same_backup_can_retry(self):
+        record = self.invoke()
+        self.runtime.apply.reset_mock()
+        restore = Mock(side_effect=[OSError("synthetic private failure"), None])
+        with (
+            patch.object(core.data, "prepared", return_value=nullcontext("same-backup")) as prepare,
+            patch.object(
+                core.data, "confirm", return_value=core.data.Approval("synthetic")
+            ) as confirm,
+            patch.object(core.data, "inventory", return_value=[]),
+            patch.object(core.data, "restore", restore),
+            patch.object(core.sys, "stdin", SimpleNamespace(isatty=lambda: True)),
+            redirect_stdout(io.StringIO()),
+        ):
+            with self.assertRaises(OSError):
+                core.rollback(record, "offline-key", True)
+            self.assertEqual(core.state.load(record)["phase"], "rollback-failed")
+            self.assertTrue(core.state.load(record)["restore_database"])
+            self.runtime.apply.assert_not_called()
+            self.runtime.stop.assert_called_once()
+            core.rollback(record, "offline-key", True)
+        self.assertEqual(core.state.load(record)["phase"], "rolled-back")
+        self.assertEqual(prepare.call_count, 2)
+        self.assertEqual(confirm.call_count, 2)
+        self.assertEqual(prepare.call_args_list[0], prepare.call_args_list[1])
+        self.assertEqual(restore.call_count, 2)
+        self.runtime.apply.assert_called_once_with(None)

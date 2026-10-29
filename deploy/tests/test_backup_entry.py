@@ -166,3 +166,14 @@ class EntryTests(unittest.TestCase):
             factory.return_value.collect.side_effect = collect
             self.assertEqual(self.invoke(), (1, "备份:失败:InterruptedError\n"))
             prune.assert_not_called()
+
+    def test_release_owned_lock_is_reused_for_real_encrypted_backup(self):
+        with (
+            backup.operation(),
+            patch.object(backup, "operation", side_effect=AssertionError("不能获取第二把锁")),
+        ):
+            archive = backup.backup(self.env, locked=True)
+        self.assertTrue(archive.is_file())
+        self.assertFalse(list((self.root / "data/backups").glob(".backup-clear-*")))
+        manifest = bundle.unpack(archive, self.root / "from-release", self.identity)
+        self.assertEqual(manifest["project"], "customer")
