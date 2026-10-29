@@ -8,6 +8,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ import backup_bundle as bundle
 from backup_collect import CollectionError, Collector
 
 ROOT = Path(__file__).resolve().parent
+BACKUP_LOCK_WAIT = 300
 
 
 def private(path, directory=False):
@@ -31,8 +33,11 @@ def private(path, directory=False):
 
 
 @contextmanager
-def operation():
-    """备份、恢复和发布共用此锁；不删除锁文件，避免第二把锁。"""
+def operation(wait=0):
+    """备份、恢复和发布共用此锁；不删除锁文件，避免第二把锁。
+
+    wait 秒内锁被占用时每秒重试一次；超时仍抛 BlockingIOError。
+    """
     folder = ROOT / "data"
     if folder.is_symlink():
         raise ValueError("data 目录不能是链接")
@@ -41,7 +46,15 @@ def operation():
         os.open(folder / "operations.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600), "rb"
     ) as lock:
         private(folder / "operations.lock")
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(1)
         yield
 
 
@@ -133,7 +146,8 @@ def copy_secrets(destination):
 
 def backup(env):
     os.umask(0o077)
-    with operation(), cancellation() as check:
+    # 每 5 分钟的 make health 会短暂持锁；定时备份等它结束，不因撞上而整晚失败。
+    with operation(wait=BACKUP_LOCK_WAIT), cancellation() as check:
         project, recipient, target, daily, weekly = configuration(env)
         revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, stderr=subprocess.DEVNULL, text=True
