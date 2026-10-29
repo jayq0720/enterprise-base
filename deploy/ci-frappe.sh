@@ -54,4 +54,4 @@ mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/
 uv run --python 3.12 python deploy/ci-frappe-qdrant.py
-uv run --python 3.12 python deploy/ci-postgres-rollback.py
+uv run --python 3.12 python deploy/ci-postgres-rollback.py --retry-after-failure
