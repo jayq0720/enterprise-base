@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import subprocess
 import sys
 import tempfile
 import time
@@ -85,6 +86,20 @@ def main():
                     database,
                     "UPDATE release_probe SET value=2; CREATE TABLE post_release(value integer)",
                 )
+            if "--retry-after-failure" in sys.argv[1:]:
+                # 只对本脚本新建的无网络合成数据库故意喂坏dump；原备份保持不变。
+                damaged = payload / "damaged"
+                damaged.mkdir()
+                (damaged / "postgres-0.dump").write_bytes(b"invalid synthetic dump")
+                try:
+                    apply(name, damaged, databases, command)
+                except subprocess.CalledProcessError:
+                    pass
+                else:
+                    raise AssertionError("损坏输入未被拒绝")
+                if sql("synthetic_app", "SELECT to_regclass('release_probe')").strip():
+                    raise AssertionError("没有复现恢复失败后的空库")
+                print("PostgreSQL故障注入：原生pg_restore失败后空库已复现，使用原备份重试。")
             apply(name, payload, databases, command)
             for database in databases:
                 restored = json.loads(
