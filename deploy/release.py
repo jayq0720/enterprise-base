@@ -94,7 +94,7 @@ def failed(record, runtime, mutated, phase):
 
 def release(revision):
     record, runtime, mutated = None, None, False
-    with backup.operation(), backup.cancellation() as check:
+    with backup.operation(wait=backup.BACKUP_LOCK_WAIT), backup.cancellation() as check:
         try:
             print("发布:检查")
             git("fetch", "origin", "main")
@@ -178,7 +178,7 @@ def release(revision):
 
 def rollback(record=None, identity=None, restore_data=False):
     runtime, mutated = None, False
-    with backup.operation(), backup.cancellation() as check:
+    with backup.operation(wait=backup.BACKUP_LOCK_WAIT), backup.cancellation() as check:
         print("回滚:检查")
         if record is None:
             candidates = sorted((ROOT / "data/releases").glob("*/release.json"), reverse=True)
