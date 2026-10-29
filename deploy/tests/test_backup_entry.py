@@ -6,6 +6,8 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import UTC, datetime, timedelta
@@ -132,6 +134,28 @@ class EntryTests(unittest.TestCase):
             )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(b"BlockingIOError", result.stderr)
+
+    def test_lock_wait_retries_until_short_holder_releases(self):
+        held, release = threading.Event(), threading.Event()
+
+        def holder():
+            with backup.operation():
+                held.set()
+                release.wait(5)
+
+        thread = threading.Thread(target=holder)
+        thread.start()
+        held.wait(5)
+        with self.assertRaises(BlockingIOError):
+            with backup.operation():
+                pass
+        threading.Timer(1.5, release.set).start()
+        started = time.monotonic()
+        with backup.operation(wait=10):
+            waited = time.monotonic() - started
+        thread.join()
+        self.assertGreaterEqual(waited, 1)
+        self.assertLess(waited, 10)
 
     def test_termination_defers_until_collector_finishes_then_cleans(self):
         def collect(_folder):
