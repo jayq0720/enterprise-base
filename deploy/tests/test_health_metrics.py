@@ -63,6 +63,32 @@ class MetricTests(unittest.TestCase):
             metrics.disk(containers, "eb", run)
         self.assertEqual(run.call_count, 1)
 
+    def test_disk_skips_anonymous_volumes(self):
+        anonymous = "f" * 64
+        containers = {
+            ("hr", "backend"): dict(
+                Image="sha256:" + "a" * 64, Mounts=[dict(Type="volume", Name="eb-hr_sites")]
+            ),
+            ("dify", "ssrf_proxy"): dict(
+                Image="sha256:" + "b" * 64, Mounts=[dict(Type="volume", Name=anonymous)]
+            ),
+        }
+        records = [
+            dict(Name="eb-hr_sites", Labels={"com.docker.compose.project": "eb-hr"}),
+            dict(Name=anonymous, Labels={"com.docker.volume.anonymous": ""}),
+        ]
+        run = Mock(side_effect=[json.dumps(records).encode(), b"created", b"15", b""])
+        self.assertEqual(metrics.disk(containers, "eb", run), 15)
+        creation = " ".join(run.call_args_list[1].args[0])
+        self.assertIn("source=eb-hr_sites", creation)
+        self.assertNotIn(anonymous, creation)
+        run.reset_mock(side_effect=True)
+        run.return_value = json.dumps(records[1:]).encode()
+        containers.pop(("hr", "backend"))
+        containers["hr", "backend"] = containers.pop(("dify", "ssrf_proxy"))
+        with self.assertRaises(ValueError):
+            metrics.disk(containers, "eb", run)
+
     def test_thresholds_tls_and_failure_only_return_numeric_values(self):
         cfg = dict(EB_SCHEME="https", EB_PROJECT="eb")
         with (

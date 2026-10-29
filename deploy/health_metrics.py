@@ -81,13 +81,17 @@ def disk(containers, project, run):
     if not names:
         raise ValueError("缺少数据卷")
     records = json.loads(run(["docker", "volume", "inspect", *names]))
+    if len(records) != len(names) or any(v["Name"] not in names for v in records):
+        raise ValueError("数据卷归属无效")
+    # Dify 的 squid 等镜像自带匿名卷，没有 Compose 项目标签；它们和命名卷在同一个
+    # Docker 数据目录，跳过不影响磁盘判断。其余卷仍必须属于本项目三套 Compose。
+    records = [v for v in records if "com.docker.volume.anonymous" not in (v.get("Labels") or {})]
     owners = {project, project + "-hr", project + "-dify"}
-    if len(records) != len(names) or any(
-        v["Name"] not in names
-        or (v.get("Labels") or {}).get("com.docker.compose.project") not in owners
-        for v in records
+    if not records or any(
+        (v.get("Labels") or {}).get("com.docker.compose.project") not in owners for v in records
     ):
         raise ValueError("数据卷归属无效")
+    names = sorted(v["Name"] for v in records)
     image = containers["hr", "backend"]["Image"]
     if not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
         raise ValueError("探针镜像无效")
