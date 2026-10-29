@@ -113,14 +113,19 @@ def disk(containers, project, run):
         paths.append(path)
         args += ["--mount", f"type=volume,source={volume},target={path},readonly,volume-nocopy"]
     args += ["--entrypoint", "/home/frappe/frappe-bench/env/bin/python", image, "-c", DISK, *paths]
-    created = False
+    completed = False
     try:
         run(args)
-        created = True
-        return float(run(["docker", "start", "-a", name]))
+        value = float(run(["docker", "start", "-a", name]))
+        completed = True
+        return value
     finally:
-        if created:
+        # create超时也可能已经创建容器；按本次唯一名称尝试清理，保留原始错误。
+        try:
             run(["docker", "rm", "-f", name])
+        except Exception:
+            if completed:
+                raise
 
 
 def certificate(config, kind, now, timeout):

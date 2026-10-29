@@ -52,6 +52,10 @@ class MetricTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):
             metrics.disk(containers, "eb", run)
         self.assertEqual(run.call_args.args[0][:3], ["docker", "rm", "-f"])
+        run.side_effect = [json.dumps([record]).encode(), TimeoutError("private"), b""]
+        with self.assertRaises(TimeoutError):
+            metrics.disk(containers, "eb", run)
+        self.assertEqual(run.call_args.args[0][:3], ["docker", "rm", "-f"])
         record["Labels"]["com.docker.compose.project"] = "foreign"
         run.reset_mock(side_effect=True)
         run.return_value = json.dumps([record]).encode()
