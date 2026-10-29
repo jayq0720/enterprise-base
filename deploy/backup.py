@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -144,10 +144,11 @@ def copy_secrets(destination):
                 output.write(data)
 
 
-def backup(env):
+def backup(env, *, locked=False):
     os.umask(0o077)
     # 每 5 分钟的 make health 会短暂持锁；定时备份等它结束，不因撞上而整晚失败。
-    with operation(wait=BACKUP_LOCK_WAIT), cancellation() as check:
+    lock = nullcontext() if locked else operation(wait=BACKUP_LOCK_WAIT)
+    with lock, cancellation() as check:
         project, recipient, target, daily, weekly = configuration(env)
         revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, stderr=subprocess.DEVNULL, text=True
