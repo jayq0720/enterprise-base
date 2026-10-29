@@ -127,7 +127,7 @@ class Target:
                 failures.append(stack)
         return failures
 
-    def frappe(self, stage, sites, primary, port):
+    def frappe(self, stage, sites, primary, port, *, existing=False):
         backend = self.container("hr", "backend")
         folder = "/tmp/eb-restore-" + self.operation
         config = ws.values(self.deploy / "secrets/.env")
@@ -143,6 +143,7 @@ class Target:
             "EB_RESTORE_DB_ROOT_PASSWORD",
             "--env",
             "EB_RESTORE_ADMIN_PASSWORD",
+            *(["--env", "EB_RESTORE_EXISTING_APPROVED"] if existing else []),
             backend,
         ]
         succeeded = False
@@ -155,6 +156,7 @@ class Target:
                 "backup.py",
                 "backup_bundle.py",
                 "backup_collect.py",
+                *(("restore_frappe_existing.py",) if existing else ()),
             ):
                 self.call(["docker", "cp", str(ROOT / name), backend + ":" + folder + "/" + name])
             self.call(
@@ -172,20 +174,24 @@ class Target:
                 ]
             )
             for index, site in enumerate(sites):
+                if existing:
+                    env["EB_RESTORE_EXISTING_APPROVED"] = site
+                script = "restore_frappe_existing.py" if existing else "restore_frappe.py"
                 self.call(
                     [
                         *credentialed,
                         "env/bin/python",
-                        folder + "/restore_frappe.py",
+                        folder + "/" + script,
                         site,
                         folder + f"/input/{index}",
                     ],
                     env=env,
                 )
-            url = f"http://hr.{config['EB_DOMAIN']}:{port}"
-            self.call(
-                [*prefix, backend, "bench", "--site", primary, "set-config", "host_name", url]
-            )
+            if not existing:
+                url = f"http://hr.{config['EB_DOMAIN']}:{port}"
+                self.call(
+                    [*prefix, backend, "bench", "--site", primary, "set-config", "host_name", url]
+                )
             succeeded = True
         finally:
             try:
