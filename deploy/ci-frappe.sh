@@ -49,8 +49,9 @@ docker run --name eb-frappe --network eb-contract --entrypoint bash \
   >/tmp/eb-frappe-test.log 2>&1 || {
     tr '\r' '\n' </tmp/eb-frappe-test.log | tail -n 300; exit 1;
   }
-tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting|越权拒绝通过|不重置技术账号|岗位开关升级|两次原生迁移|Frappe 恢复演练' || true
+tr '\r' '\n' </tmp/eb-frappe-test.log | grep -E 'Ran .* tests|^OK$|真实 Frappe|Exporting|越权拒绝通过|不重置技术账号|岗位开关升级|两次原生迁移|Frappe 恢复演练|Frappe 已有站点回滚' || true
 mkdir -p artifacts
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/fixtures/. artifacts/
 docker cp eb-frappe:/home/frappe/frappe-bench/apps/enterprise_base/enterprise_base/setup_fixtures/. artifacts/
 uv run --python 3.12 python deploy/ci-frappe-qdrant.py
+uv run --python 3.12 python deploy/ci-postgres-rollback.py
