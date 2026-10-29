@@ -111,10 +111,10 @@ class Runtime(Target):
         self.compose("hr", "run", "--rm", "--no-deps", "configurator")
         self.start("hr", ["backend"])
         self.step = "Frappe迁移"
-        migrate()
-        self.call(
-            ["docker", "exec", self.container("hr", "backend"), "bench", "--site", "all", "migrate"]
-        )
+        if migrate is not None:
+            migrate()
+            backend = self.container("hr", "backend")
+            self.call(["docker", "exec", backend, "bench", "--site", "all", "migrate"])
         self.step = "Frappe启动"
         self.start(
             "hr",
