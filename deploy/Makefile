@@ -16,7 +16,6 @@ config: prepare
 	$(DIFY) config --quiet
 	$(HR) --profile bootstrap --profile policy-sync --profile hr-assistant config --quiet
 verify:
-	$(PYTHON) -m unittest discover -s tests -p 'test_health_metrics.py'
 	$(PYTHON) validate.py
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_bundle.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_collect.py'
@@ -26,6 +25,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_guard.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_frappe.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_qdrant.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_health_metrics.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_workspace.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_runtime.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_entry.py'
