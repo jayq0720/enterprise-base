@@ -16,11 +16,11 @@ config: prepare
 	$(DIFY) config --quiet
 	$(HR) --profile bootstrap --profile policy-sync --profile hr-assistant config --quiet
 verify:
-	$(PYTHON) -m unittest discover -s tests -p 'test_health_alerts.py'
 	$(PYTHON) validate.py
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_bundle.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_collect.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_entry.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_health_alerts.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_postgres.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_storage.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_restore_guard.py'
