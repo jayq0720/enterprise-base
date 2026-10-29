@@ -1,0 +1,43 @@
+# 测试环境自动发布：main 上的 ci 通过后，只把该提交号通过 SSH 交给测试服务器的发布入口。
+# 默认关闭；仓库变量 EB_TEST_DEPLOY=true 且密钥配好后才运行。说明见 docs/测试环境自动部署.md。
+name: deploy-test
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# 同一环境串行；不取消正在进行的备份或迁移。
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # 只接受本仓库 main 的 push 触发的成功 CI，fork 的同名分支不算。
+    if: >-
+      vars.EB_TEST_DEPLOY == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: test
+    steps:
+      - name: 发布到测试环境
+        env:
+          SSH_KEY: ${{ secrets.EB_TEST_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.EB_TEST_SSH_KNOWN_HOSTS }}
+          TARGET: ${{ secrets.EB_TEST_SSH_TARGET }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          umask 077
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          ssh -i "$RUNNER_TEMP/deploy_key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" \
+            "$TARGET" "$SHA"
