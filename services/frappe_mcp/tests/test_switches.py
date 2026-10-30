@@ -93,6 +93,9 @@ async def test_frappe_reads_switches_from_designation(settings: Settings) -> Non
             "eb_tool_leave_apply": True,
             "eb_tool_approval": True,
             "eb_tool_duties": False,
+            # 老版本 X1 没有营销开关时字段不在返回里，按未设置处理（工具会拒绝，不默认放开）
+            "eb_tool_inquiry": None,
+            "eb_tool_inquiry_stats": None,
         }
         assert await hr.tool_switches("会计") is None
     # 按 X1 白名单的方式查：列表接口、指定字段、按名称精确过滤

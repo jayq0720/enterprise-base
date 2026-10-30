@@ -53,6 +53,8 @@ def test_profile(portal_settings: Settings) -> None:
             "leave_apply": True,
             "approval": False,
             "duties": True,
+            "inquiry": True,
+            "inquiry_stats": True,
         }
         assert "user_id" not in me and "zs@example.com" not in str(me)
         # 没有岗位：能登录但所有功能关闭，并提示补岗位

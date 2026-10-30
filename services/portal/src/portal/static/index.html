@@ -11,7 +11,7 @@
   <section id="login" class="login" hidden>
     <div class="login-card">
       <h1>员工服务台</h1>
-      <p>用企业微信扫码登录后，可以问 HR 助手、查制度、请假和审批。</p>
+      <p>用企业微信扫码登录后，可以问 HR 助手、查制度、请假、审批和处理询盘。</p>
       <p id="login-error" class="error" hidden></p>
       <a class="button primary" href="/auth/login">企业微信扫码登录</a>
     </div>
@@ -74,6 +74,50 @@
       <section data-tab="duties" class="panel" hidden>
         <h2 id="duties-title">岗位职责</h2>
         <pre id="duties" class="duties"></pre>
+      </section>
+
+      <section data-tab="inquiry" class="panel" hidden>
+        <div class="toolbar">
+          <h2>我的询盘</h2>
+          <label class="inline"><input id="inquiry-closed" type="checkbox"> 包括已结束的</label>
+        </div>
+        <table id="inquiries"><thead><tr><th>等级</th><th>客户</th><th>产品</th><th>渠道</th><th>收到</th><th>状态</th><th></th></tr></thead><tbody></tbody></table>
+        <div id="inquiry" class="detail" hidden>
+          <h2 id="inquiry-title"></h2>
+          <dl id="inquiry-fields" class="fields"></dl>
+          <h3>需求原文</h3>
+          <p id="inquiry-requirement" class="quote"></p>
+          <h3>跟进记录</h3>
+          <ul id="inquiry-notes" class="notes"></ul>
+          <form id="follow-up" class="grid">
+            <label>改状态<select name="status">
+              <option value="">不改</option>
+              <option>跟进中</option><option>已回复</option><option>有意向</option><option>无效</option>
+            </select></label>
+            <label class="wide">跟进记录<input name="note" maxlength="1000" placeholder="例如：已电话沟通，下周发样品"></label>
+            <button class="button primary">保存</button>
+          </form>
+        </div>
+      </section>
+
+      <section data-tab="marketing" class="panel chat" hidden>
+        <div class="messages" aria-live="polite"></div>
+        <form class="ask">
+          <input name="q" autocomplete="off" maxlength="2000" placeholder="例如：我有哪些新询盘？给 CRM-LEAD-2026-00001 写回复草稿">
+          <button class="button primary">发送</button>
+          <button class="link reset" type="button">新对话</button>
+        </form>
+      </section>
+
+      <section data-tab="inquiry-stats" class="panel" hidden>
+        <div class="toolbar">
+          <h2>询盘统计</h2>
+          <select id="stats-days" class="narrow">
+            <option value="7">最近 7 天</option><option value="30" selected>最近 30 天</option><option value="90">最近 90 天</option>
+          </select>
+        </div>
+        <p id="stats-summary"></p>
+        <div id="stats" class="stats"></div>
       </section>
 
       <section data-tab="knowledge" class="panel" hidden>

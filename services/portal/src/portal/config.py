@@ -33,11 +33,15 @@ class Settings(BaseSettings):
     dify_api_base: HttpUrl
     dify_hr_app_key: SecretStr | None = None
     dify_policy_app_key: SecretStr | None = None
+    # 询盘助手（营销）；不填就不显示
+    dify_marketing_app_key: SecretStr | None = None
 
     http_timeout_seconds: float = 10.0
     chat_timeout_seconds: float = 120.0
 
-    @field_validator("dify_hr_app_key", "dify_policy_app_key", mode="before")
+    @field_validator(
+        "dify_hr_app_key", "dify_policy_app_key", "dify_marketing_app_key", mode="before"
+    )
     @classmethod
     def _blank_is_none(cls, v: object) -> object:
         # 部署生成的配置里留空表示没开这个应用，前台不显示对应对话

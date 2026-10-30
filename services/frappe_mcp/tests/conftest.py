@@ -42,13 +42,15 @@ class FakeHR:
         # 岗位 → 功能开关；X1 升级后已有岗位的开关都是开，不在这里的岗位相当于不存在
         on = dict.fromkeys(TOOL_SWITCH_FIELDS, True)
         self.switches: dict[str, dict[str, bool | None]] = {"出纳": {**on}, "主管": {**on}}
+        self.inquiry_calls: list[tuple[str, dict[str, Any]]] = []
 
     async def employee(self, wecom_userid: str) -> Employee | None:
         if self.down:
             import httpx
 
             raise httpx.ConnectError("down")
-        return self.employees.get(wecom_userid)
+        emp = self.employees.get(wecom_userid)
+        return emp.model_copy(update={"wecom_userid": wecom_userid}) if emp else None
 
     async def leave_balance(self, employee: str, on: datetime.date) -> dict[str, Any]:
         self.calls.append(("balance", employee))
@@ -102,3 +104,57 @@ class FakeHR:
         if wecom_userid == "lisi" and leave == "HR-LAP-1":
             return {"ok": True, "stage": "EB Leave HR"}
         return {"ok": False, "reason": "forbidden"}
+
+    async def inquiry_call(self, method: str, body: dict[str, Any]) -> dict[str, Any]:
+        """模拟 Frappe 询盘方法：CRM-LEAD-1 属于张三，其他人一律 forbidden。"""
+        if self.down:
+            import httpx
+
+            raise httpx.ConnectError("down")
+        self.inquiry_calls.append((method, body))
+        row = {
+            "name": "CRM-LEAD-1",
+            "lead_name": "Alice",
+            "company_name": "Acme",
+            "country": "Germany",
+            "status": "Lead",
+            "eb_channel": "网站表单",
+            "eb_grade": "A",
+            "eb_score": 70,
+            "eb_product": "阀门",
+            "creation": "2026-10-30 10:00:00.123456",
+            "eb_first_response_at": None,
+            "eb_requirement": "Need 500 pcs",
+            "eb_ai_engine": "ChatGPT",
+        }
+        mine = body.get("userid") == "zhangsan"
+        if method == "intake":
+            data = body["data"]
+            if not (data.get("email") or data.get("phone")):
+                return {"ok": False, "reason": "no_contact"}
+            return {
+                "ok": True,
+                "id": "CRM-LEAD-2",
+                "duplicate": False,
+                "grade": "B",
+                "assigned": True,
+            }
+        if method == "my_inquiries":
+            return {"ok": True, "inquiries": [row] if mine else []}
+        if method == "stats":
+            return {"ok": True, "days": body["days"], "total": 1, "by_status": {"Lead": 1}}
+        if not mine or body.get("lead") != "CRM-LEAD-1":
+            return {"ok": False, "reason": "forbidden"}
+        if method == "inquiry":
+            if body.get("contact"):
+                row = {**row, "email_id": "alice@acme.example", "mobile_no": "+49 1"}
+            return {
+                "ok": True,
+                "inquiry": row,
+                "notes": [{"note": "已电话联系", "by": "张三", "at": ""}],
+            }
+        if method == "follow_up":
+            if body["status"] not in ("", "Open", "Replied", "Interested", "Do Not Contact"):
+                return {"ok": False, "reason": "invalid"}
+            return {"ok": True, "status": body["status"] or "Lead"}
+        raise AssertionError(method)

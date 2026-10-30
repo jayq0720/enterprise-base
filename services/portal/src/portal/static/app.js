@@ -9,6 +9,9 @@ const TABS = [
   { id: "leave", label: "我的假期", show: (me) => me.features.leave_query || me.features.leave_apply },
   { id: "approval", label: "待我审批", show: (me) => me.features.approval },
   { id: "duties", label: "岗位职责", show: (me) => me.features.duties },
+  { id: "inquiry", label: "我的询盘", show: (me) => me.features.inquiry },
+  { id: "marketing", label: "询盘助手", show: (me) => me.chat.marketing && me.features.inquiry },
+  { id: "inquiry-stats", label: "询盘统计", show: (me) => me.features.inquiry_stats },
   { id: "knowledge", label: "知识检索", show: () => true },
 ];
 
@@ -193,6 +196,106 @@ async function loadApprovals() {
   );
 }
 
+// —— 询盘 ——
+const SOURCE = { landing_page: "落地页", keyword: "搜索关键词", ai_engine: "AI 引擎", utm_source: "UTM 来源", utm_medium: "UTM 媒介", utm_campaign: "UTM 活动" };
+let currentInquiry = "";
+
+async function loadInquiries() {
+  const r = await api("/api/inquiries" + ($("#inquiry-closed").checked ? "?closed=1" : ""));
+  if (r.error) fail(new Error(r.error));
+  fill(
+    $("#inquiries"),
+    r.inquiries || [],
+    (row) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "button small";
+      b.textContent = "查看";
+      b.addEventListener("click", () => showInquiry(row.id).catch(fail));
+      const who = [row.customer, row.company, row.country].filter(Boolean).join(" · ");
+      return [row.grade || "-", who, row.product, row.channel, row.received_at, row.status, b];
+    },
+    "没有分配给你的询盘",
+  );
+}
+
+function field(list, label, value) {
+  if (!value) return;
+  const dt = document.createElement("dt");
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  dd.textContent = value;
+  list.append(dt, dd);
+}
+
+async function showInquiry(id) {
+  const r = await api("/api/inquiries/detail", { inquiry_id: id });
+  if (!r.ok) throw new Error(r.error);
+  const q = r.inquiry;
+  currentInquiry = q.id;
+  $("#inquiry").hidden = false;
+  $("#inquiry-title").textContent = `${q.id} · ${q.grade || "-"} 级 · ${q.status}`;
+  const list = $("#inquiry-fields");
+  list.replaceChildren();
+  field(list, "客户", [q.customer, q.company].filter(Boolean).join("，"));
+  field(list, "国家/语言", [q.country, q.language].filter(Boolean).join(" / "));
+  field(list, "邮箱", q.contact && q.contact.email);
+  field(list, "电话", q.contact && q.contact.phone);
+  field(list, "官网", q.website);
+  field(list, "产品/数量/时间", [q.product, q.quantity, q.timeline].filter(Boolean).join("，"));
+  field(list, "渠道", q.channel);
+  for (const [k, label] of Object.entries(SOURCE)) field(list, label, q.source[k]);
+  field(list, "评分", `${q.score} 分：${q.score_reasons || ""}`);
+  $("#inquiry-requirement").textContent = q.requirement || "（无）";
+  $("#inquiry-notes").replaceChildren(
+    ...(r.notes.length ? r.notes : [{ note: "暂无跟进记录" }]).map((n) => {
+      const li = document.createElement("li");
+      li.textContent = n.at ? `${n.at.slice(0, 16)} ${n.by}：${n.note}` : n.note;
+      return li;
+    }),
+  );
+  $("#inquiry").scrollIntoView({ behavior: "smooth" });
+}
+
+function setupInquiry() {
+  $("#inquiry-closed").addEventListener("change", () => loadInquiries().catch(fail));
+  $("#follow-up").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    try {
+      const r = await api("/api/inquiries/follow-up", { inquiry_id: currentInquiry, status: f.status.value, note: f.note.value });
+      if (!r.ok) throw new Error(r.error);
+      f.reset();
+      await showInquiry(currentInquiry);
+      await loadInquiries();
+    } catch (err) {
+      fail(err);
+    }
+  });
+}
+
+async function loadStats() {
+  const r = await api("/api/inquiries/stats", { days: $("#stats-days").value });
+  if (!r.ok) throw new Error(r.error);
+  const avg = r.avg_first_response_minutes;
+  $("#stats-summary").textContent = `最近 ${r.days} 天新进询盘 ${r.total} 条` + (avg === null ? "。" : `，平均首次响应 ${Math.round(avg)} 分钟。`);
+  const box = $("#stats");
+  box.replaceChildren();
+  for (const [key, title] of [["by_channel", "按渠道"], ["by_grade", "按等级"], ["by_ai_engine", "按 AI 引擎来源"], ["by_status", "按状态"]]) {
+    const table = document.createElement("table");
+    const head = table.createTHead().insertRow();
+    cell(head, title);
+    cell(head, "数量");
+    const body = table.createTBody();
+    for (const [k, n] of Object.entries(r[key] || {})) {
+      const tr = body.insertRow();
+      cell(tr, k);
+      cell(tr, n);
+    }
+    box.appendChild(table);
+  }
+}
+
 // —— 岗位职责、知识检索 ——
 async function loadDuties() {
   const r = await api("/api/duties");
@@ -227,7 +330,7 @@ function setupSearch() {
   });
 }
 
-const loaders = { leave: loadLeave, approval: loadApprovals, duties: loadDuties };
+const loaders = { leave: loadLeave, approval: loadApprovals, duties: loadDuties, inquiry: loadInquiries, "inquiry-stats": loadStats };
 
 function openTab(id, me) {
   for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("active", b.dataset.id === id);
@@ -262,6 +365,9 @@ async function start() {
   setupChat($('[data-tab="hr"]'), "hr");
   setupChat($('[data-tab="policy"]'), "policy");
   setupLeave(me);
+  setupChat($('[data-tab="marketing"]'), "marketing");
+  setupInquiry();
+  $("#stats-days").addEventListener("change", () => loadStats().catch(fail));
   setupSearch();
   $("#logout").addEventListener("click", async () => {
     await api("/auth/logout", {}).catch(() => {});

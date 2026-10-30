@@ -178,7 +178,7 @@ def validate(work):
     values = settings(private)
     original = dict(values)
     upgraded = {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", "EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET",
-                "EB_MCP_PORTAL_TOKEN", "EB_PORTAL_SESSION_SECRET"}
+                "EB_MCP_PORTAL_TOKEN", "EB_PORTAL_SESSION_SECRET", "EB_MCP_INTAKE_TOKEN"}
     added = {k for k in values if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_", "EB_PORTAL_"))}
     private.write_text("".join(f"{k}={v}\n" for k, v in values.items()
                                if k not in upgraded | added))
@@ -225,6 +225,7 @@ def validate(work):
     prepare("portal", "secrets/.env", success=False)
     for defect, replacement in (("EB_PORTAL_WECOM_APP_SECRET", ""), ("EB_MCP_PORTAL_TOKEN", values["EB_MCP_SERVICE_TOKEN"]),
             ("EB_PORTAL_SESSION_SECRET", "short"), ("EB_PORTAL_IMAGE", "image:latest"),
+            ("EB_MCP_INTAKE_TOKEN", values["EB_MCP_SERVICE_TOKEN"]), ("EB_MCP_INTAKE_TOKEN", "short"),
             ("EB_PORTAL_IMAGE", "ghcr.io/jayq0720/enterprise-base-portal@sha256:" + "0" * 64)):
         incomplete.write_text("".join(f"{k}={replacement if k == defect else v}\n" for k, v in front.items()))
         prepare("portal", str(incomplete), success=False)
@@ -373,6 +374,8 @@ def validate(work):
                 require(front["EB_PORTAL_PUBLIC_URL"] == f"{scheme}://portal.{domain}"
                         and front["EB_PORTAL_X4_PORTAL_TOKEN"] == values["EB_MCP_PORTAL_TOKEN"]
                         == services["frappe-mcp"]["environment"]["EB_MCP_PORTAL_TOKEN"]
+                        and services["frappe-mcp"]["environment"]["EB_MCP_INTAKE_TOKEN"] == values["EB_MCP_INTAKE_TOKEN"]
+                        and front["EB_PORTAL_DIFY_MARKETING_APP_KEY"] == values.get("EB_PORTAL_DIFY_MARKETING_APP_KEY", "")
                         and front["EB_PORTAL_X3_TOKEN"] == values["EB_KB_SERVICE_TOKEN"]
                         and front["EB_PORTAL_SESSION_SECRET"] == values["EB_PORTAL_SESSION_SECRET"]
                         and set(front) == set(settings(ROOT.parent / "services/portal/.env.example")),

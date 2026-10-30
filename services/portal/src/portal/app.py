@@ -5,6 +5,8 @@
 - `POST /auth/logout`
 - `/api/*`：页面调用的接口。身份只取会话 Cookie 里的 userid，由服务端带给 X4、X3、Dify；
   浏览器拿不到任何服务 Token 或 Dify Key，传来的身份字段一律不用
+- `POST /inquiry/intake`：网站表单后台推询盘，原样转给 X4（带网站自己的进件 Token，X4 校验）；
+  不用登录，也不走页面接口的同源检查
 - `GET /healthz`、`/` 和 `/static/*` 页面文件
 """
 
@@ -34,6 +36,7 @@ STATIC = Path(__file__).with_name("static")
 COOKIE = "__Host-eb_portal"
 LOGIN_COOKIE = "__Host-eb_portal_login"
 RANDOM = re.compile(r"[A-Za-z0-9_-]{43}\Z")
+MAX_INTAKE = 32768
 CONVERSATION = re.compile(r"[0-9a-fA-F-]{36}\Z")
 UNAVAILABLE = "系统暂时不可用，请稍后再试。"
 CSP = (
@@ -47,11 +50,16 @@ READS = {
     "/api/leave/types": "leave_types",
     "/api/approvals": "pending_my_approval",
     "/api/duties": "my_responsibilities",
+    "/api/inquiries": "my_inquiries",
 }
 WRITES = {
     "/api/leave/draft": ("draft_leave", ("leave_type", "from_date", "to_date", "reason")),
     "/api/leave/confirm": ("confirm_leave", ("draft_token",)),
     "/api/approvals/decide": ("decide", ("leave", "action")),
+    # 询盘详情带客户联系方式，用 POST 免得询盘号进访问日志
+    "/api/inquiries/detail": ("inquiry_detail", ("inquiry_id",)),
+    "/api/inquiries/follow-up": ("follow_up_inquiry", ("inquiry_id", "status", "note")),
+    "/api/inquiries/stats": ("inquiry_stats", ("days",)),
 }
 
 
@@ -231,12 +239,19 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
         return value.strip()[:limit] if isinstance(value, str) else ""
 
     async def me(_: Request, uid: str, profile: dict[str, Any]) -> dict[str, Any]:
-        chat = {"hr": s.dify_hr_app_key is not None, "policy": s.dify_policy_app_key is not None}
+        chat = {
+            "hr": s.dify_hr_app_key is not None,
+            "policy": s.dify_policy_app_key is not None,
+            "marketing": s.dify_marketing_app_key is not None,
+        }
         keys = ("employee_name", "designation", "features", "notice")
         return {**{k: profile[k] for k in keys if k in profile}, "chat": chat}
 
     async def read(request: Request, uid: str, _: dict[str, Any]) -> dict[str, Any]:
-        return await api.x4(READS[request.url.path], uid)
+        name = READS[request.url.path]
+        if name == "my_inquiries" and request.query_params.get("closed") == "1":
+            return await api.x4(name, uid, include_closed="1")
+        return await api.x4(name, uid)
 
     async def write(request: Request, uid: str, _: dict[str, Any]) -> dict[str, Any]:
         name, fields = WRITES[request.url.path]
@@ -257,7 +272,11 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
 
     async def chat(request: Request, uid: str, _: dict[str, Any]) -> dict[str, Any]:
         body = await _body(request)
-        keys = {"hr": s.dify_hr_app_key, "policy": s.dify_policy_app_key}
+        keys = {
+            "hr": s.dify_hr_app_key,
+            "policy": s.dify_policy_app_key,
+            "marketing": s.dify_marketing_app_key,
+        }
         key = keys.get(_text(body.get("app"), 16))
         query = _text(body.get("query"), 2000)
         conversation = _text(body.get("conversation_id"), 64)
@@ -272,6 +291,19 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
             "answer": str(result.get("answer") or ""),
             "conversation_id": str(result.get("conversation_id") or ""),
         }
+
+    async def intake(request: Request) -> Response:
+        auth = request.headers.get("authorization", "")
+        body = await request.body()
+        if not auth.lower().startswith("bearer ") or len(auth) > 512:
+            return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+        if len(body) > MAX_INTAKE:
+            return JSONResponse({"ok": False, "error": "内容太长"}, status_code=413)
+        try:
+            status, data = await api.intake(auth, body)
+        except Unavailable:
+            return JSONResponse({"ok": False, "error": UNAVAILABLE}, status_code=503)
+        return JSONResponse(data, status_code=status)
 
     async def healthz(_: Request) -> Response:
         return JSONResponse({"status": "ok"})
@@ -290,6 +322,7 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
         Route("/auth/login", login),
         Route("/auth/callback", login_callback),
         Route("/auth/logout", logout, methods=["POST"]),
+        Route("/inquiry/intake", intake, methods=["POST"]),
         Route("/api/me", endpoint(me)),
         Route("/api/search", endpoint(search), methods=["POST"]),
         Route("/api/chat", endpoint(chat), methods=["POST"]),

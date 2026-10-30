@@ -48,7 +48,11 @@ def test_mcp_lists_and_calls_tools(settings: Settings) -> None:
         names = sorted(t["name"] for t in tools["tools"])  # type: ignore[index]
         assert names == [
             "draft_leave",
+            "follow_up_inquiry",
+            "inquiry_detail",
+            "inquiry_stats",
             "leave_balance",
+            "my_inquiries",
             "my_leave_applications",
             "my_responsibilities",
             "pending_my_approval",

@@ -3,6 +3,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from pydantic import SecretStr
 from starlette.testclient import TestClient
 
 from portal import session
@@ -49,7 +50,11 @@ def test_login_success_sets_strict_session(settings: Settings) -> None:
         sess = next(v for v in cookies if v.startswith(COOKIE + "="))
         assert "HttpOnly" in sess and "Secure" in sess and "SameSite=strict" in sess
         me = c.get("/api/me", headers=API).json()
-        assert me["employee_name"] == "张三" and me["chat"] == {"hr": True, "policy": False}
+        assert me["employee_name"] == "张三" and me["chat"] == {
+            "hr": True,
+            "policy": False,
+            "marketing": False,
+        }
         assert HR_KEY not in str(me)
 
 
@@ -220,3 +225,60 @@ def test_public_url_must_be_https(settings: Settings) -> None:
     with pytest.raises(ValueError):
         Settings(**{**data, "public_url": "http://localhost.example.com"})
     Settings(**{**data, "public_url": "http://portal.localhost"})
+
+
+def test_inquiry_pages_identity_from_session(settings: Settings) -> None:
+    fake = FakeBackends()
+    marketing = settings.model_copy(
+        update={"dify_marketing_app_key": SecretStr("app-mk-key-synthetic")}
+    )
+    with client(marketing, fake) as c:
+        login(c)
+        assert c.get("/api/me", headers=API).json()["chat"]["marketing"] is True
+        c.get("/api/inquiries?user_id=lisi", headers=API)
+        c.get("/api/inquiries?closed=1", headers=API)
+        detail = {"inquiry_id": "CRM-LEAD-1", "user_id": "lisi", "contact": "1"}
+        c.post("/api/inquiries/detail", json=detail, headers=API)
+        follow = {"inquiry_id": "CRM-LEAD-1", "status": "已回复", "note": "x", "userid": "lisi"}
+        c.post("/api/inquiries/follow-up", json=follow, headers=API)
+        c.post("/api/inquiries/stats", json={"days": "7"}, headers=API)
+        c.post("/api/chat", json={"app": "marketing", "query": "我的询盘"}, headers=API)
+        calls = [x for x in fake.x4_calls if x[0] != "profile"]
+        # 身份只来自登录会话；浏览器传来的 user_id、contact 等多余字段一律不转给 X4
+        assert calls == [
+            ("my_inquiries", "zhangsan", {}),
+            ("my_inquiries", "zhangsan", {"include_closed": "1"}),
+            ("inquiry_detail", "zhangsan", {"inquiry_id": "CRM-LEAD-1"}),
+            (
+                "follow_up_inquiry",
+                "zhangsan",
+                {"inquiry_id": "CRM-LEAD-1", "status": "已回复", "note": "x"},
+            ),
+            ("inquiry_stats", "zhangsan", {"days": "7"}),
+        ]
+        assert fake.chats[-1][:2] == ("app-mk-key-synthetic", "zhangsan")
+        # 写接口同样要同源
+        bad = {"X-EB-Portal": "1", "Origin": "https://evil.test"}
+        assert c.post("/api/inquiries/follow-up", json=follow, headers=bad).status_code == 403
+    with client(settings, FakeBackends()) as c:
+        login(c)
+        assert c.get("/api/me", headers=API).json()["chat"]["marketing"] is False
+
+
+def test_intake_passthrough_without_login(settings: Settings) -> None:
+    fake = FakeBackends()
+    good = {"Authorization": "Bearer " + "i" * 40}
+    with client(settings, fake) as c:
+        # 不用登录、不带页面头也能进件；Token 原样交给 X4 判断
+        ok = c.post("/inquiry/intake", json={"email": "a@b.example"}, headers=good)
+        assert ok.status_code == 200 and ok.json()["id"] == "CRM-LEAD-2"
+        assert fake.intakes[-1] == (good["Authorization"], b'{"email":"a@b.example"}')
+        bad = c.post("/inquiry/intake", json={}, headers={"Authorization": "Bearer wrong"})
+        assert bad.status_code == 401
+        before = len(fake.intakes)
+        assert c.post("/inquiry/intake", json={}).status_code == 401
+        big = c.post("/inquiry/intake", content=b"x" * 40000, headers=good)
+        assert big.status_code == 413 and len(fake.intakes) == before
+        assert c.get("/inquiry/intake").status_code == 405
+        fake.down = True
+        assert c.post("/inquiry/intake", json={}, headers=good).status_code == 503

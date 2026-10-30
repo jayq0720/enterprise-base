@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     mcp_session_secret: SecretStr = Field(min_length=32)
     # 员工前台（X6）调 /v1/portal/* 的 Token，和 Dify 用的分开；不填就不开前台接口
     mcp_portal_token: SecretStr | None = Field(default=None, min_length=32)
+    # 网站表单后台等外部渠道推询盘（POST /v1/inquiry/intake）的 Token，和其他 Token 分开；
+    # 不填就不开进件接口
+    mcp_intake_token: SecretStr | None = Field(default=None, min_length=32)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     # 请假草稿多久内可以确认
     draft_ttl_seconds: int = Field(default=600, ge=60, le=3600)
