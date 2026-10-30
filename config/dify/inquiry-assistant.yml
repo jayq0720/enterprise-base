@@ -1,4 +1,4 @@
-# 询盘助手（Dify Chatflow）。由营销第一批生成，说明见同目录 README.md。
+# 询盘助手（Dify Chatflow）。由营销第一、二批生成，说明见同目录 README.md。
 # 和 HR 助手一样：导入前装好通义千问插件并录入 Key，在“工具 → MCP”里添加 X4（服务标识 eb-hr），
 # 导入后在“环境变量”里填地址和 Token。模型只做意图分类、参数提取和写草稿，查谁、改什么由工作流和 X4 决定。
 app:
@@ -890,6 +890,27 @@ workflow:
                   part("按 AI 引擎来源", data.get("by_ai_engine")),
                   part("按状态", data.get("by_status")),
               ]
+              funnel = data.get("funnel") or {}
+              unit = data.get("currency") or ""
+
+              def conv(title: str, groups: dict) -> str:
+                  items = sorted((groups or {}).items(), key=lambda kv: -kv[1].get("total", 0))
+                  rows = [
+                      f"{k} 询盘 {v.get('total', 0)}、有效 {v.get('valid', 0)}、转商机 {v.get('opportunity', 0)}、"
+                      f"成交 {v.get('won', 0)}（{v.get('revenue', 0):,.2f} {unit}）"
+                      for k, v in items
+                  ]
+                  return title + "：" + ("；".join(rows) or "无")
+
+              if funnel:
+                  total = funnel.get("all") or {}
+                  lines.append(
+                      f"转化：有效 {total.get('valid', 0)}，已跟进 {total.get('responded', 0)}，"
+                      f"转商机 {total.get('opportunity', 0)}，成交 {total.get('won', 0)} 单，"
+                      f"成交额 {total.get('revenue', 0):,.2f} {unit}"
+                  )
+                  lines.append(conv("转化按渠道", funnel.get("by_channel")))
+                  lines.append(conv("转化按 AI 引擎来源", funnel.get("by_ai_engine")))
               return {"text": "\n".join(lines)}
         variables:
         - variable: out
@@ -924,7 +945,7 @@ workflow:
           · 查看某条询盘的详情和跟进记录
           · 按产品资料给询盘写回复草稿（只写草稿，由你核对后自己发送）
           · 记跟进、改状态（跟进中、已回复、有意向、无效）
-          · 统计各渠道、各 AI 引擎来的询盘
+          · 统计各渠道、各 AI 引擎来的询盘，以及转商机、成交和成交额
         variables: []
     edges:
     - data:

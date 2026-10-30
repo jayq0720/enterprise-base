@@ -64,6 +64,16 @@ def lead_fields() -> list[dict[str, Any]]:
         dict(fieldname="eb_utm_source", label="UTM 来源", fieldtype="Data"),
         dict(fieldname="eb_utm_medium", label="UTM 媒介", fieldtype="Data"),
         dict(fieldname="eb_utm_campaign", label="UTM 活动", fieldtype="Data"),
+        # 询盘提醒进度（见 marketing/alerts.py），不在表单上显示
+        dict(
+            fieldname="eb_alert_level",
+            label="提醒进度",
+            fieldtype="Int",
+            hidden=1,
+            read_only=1,
+            no_copy=1,
+            default="0",
+        ),
     ]
     previous = "eb_inquiry_section"
     for field in fields[1:]:

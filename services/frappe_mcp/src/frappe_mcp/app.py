@@ -145,7 +145,8 @@ def build_mcp(tools: Tools, allowed_hosts: list[str]) -> FastMCP:
 
     @mcp.tool(
         description="统计最近 days 天（1–366，默认 30）新进询盘：总数、按渠道、按等级、"
-        f"按 AI 引擎来源、按状态，以及平均首次响应分钟数。{SESSION_HINT}"
+        "按 AI 引擎来源、按状态，平均首次响应分钟数；funnel 是按渠道和 AI 来源的转化"
+        f"（有效、已跟进、转商机、成交单数、成交额，金额币种见 currency）。{SESSION_HINT}"
     )
     async def inquiry_stats(session_token: str, days: int | str = 30) -> dict[str, Any]:
         # Dify 工具节点把参数当文字传，空的或不是数字的按 30 天
