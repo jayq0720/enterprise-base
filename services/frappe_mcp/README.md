@@ -46,6 +46,14 @@ HR 在 Frappe 的“岗位”上勾选这个岗位的员工能用哪些助手功
 
 `/v1/leave/confirm` 不是 MCP 工具，模型调不到；草稿里的 userid 必须和 `sys.user_id` 一致，别人拿到草稿也提交不了；草稿内容改一个字签名就不对。提交的请假单是 Open、未提交状态，审批人按 HRMS 规则（员工上的请假审批人，没有就用部门的）自动填，之后走 HRMS 原来的审批。重叠、余额不足、假期类型不对时返回员工看得懂的提示。
 
+## 员工前台接口（X6）
+
+员工在电脑浏览器里用的前台（`services/portal`）扫码登录后，由前台服务端调 `POST /v1/portal/<功能>`，请求体带登录得到的企业微信 userid（`user_id`）和功能参数。这组接口：
+
+- 只认 `Authorization: Bearer <EB_MCP_PORTAL_TOKEN>`，和 Dify 的 `EB_MCP_SERVICE_TOKEN` 互不通用（Dify 进不了前台接口，前台也进不了 `/mcp/` 和 `/v1/session`）；不配就整组 401。
+- 功能：`profile`（登录时确认在职员工，返回姓名、岗位和四个功能开关，不返回邮箱）、`leave_balance`、`my_leave_applications`、`pending_my_approval`、`my_responsibilities`、`leave_types`、`draft_leave`、`confirm_leave`、`decide`。参数里不收任何身份字段，内部按 `user_id` 签一个 60 秒的会话令牌再调上面同样的工具，按岗位开关拒绝的规则完全一样。
+- `decide`（通过 / 退回）受“查待我审批”开关控制，调 X2 的 `enterprise_base.wecom.portal_actions.decide`：Frappe 按审批卡片同样的规则重新校验（在职、启用、非接口账号、正是当前环节指定的审批人），再以审批人本人身份走原生 Workflow。不是本人环节的单一律“不在你的待审批里”。
+
 ## 在 Dify 里接入
 
 1. 工具 → MCP → 添加 MCP 服务：地址 `http://frappe-mcp:8080/mcp/`，请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`。
@@ -64,4 +72,4 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 P2-C1：3 个查询工具和发起请假已用本地 Frappe HR 和 Dify 1.17.1 端到端实测（张三查余额和申请、李四查待审批、没有员工记录的人只收到提示；张三起草后回复“确认请假”提交成功，审批人自动带出；李四说“确认请假”不会提交张三的草稿；重复确认不会重复提交）。查岗位职责（P2-C1c）用 eb-x4 专用账号在本地 Frappe 实测：张三返回岗位和职责，李四岗位没填职责、王五档案没有岗位、查无此人各自收到提示。
 
-Frappe 的 API 用户用 X1 建好的专用账号 `eb-x4@integration.invalid`（角色 EB X4，默认停用，管理员启用并生成 Key 后填进 `EB_FRAPPE_API_KEY`/`EB_FRAPPE_API_SECRET`）。这个账号只能：按企业微信 userid 查员工的编号、姓名、用户、岗位；按岗位名查岗位职责；读假期类型和请假单；新建未提交的请假单；调 HRMS 的余额和审批人两个查询方法。其余一律 403。
+Frappe 的 API 用户用 X1 建好的专用账号 `eb-x4@integration.invalid`（角色 EB X4，默认停用，管理员启用并生成 Key 后填进 `EB_FRAPPE_API_KEY`/`EB_FRAPPE_API_SECRET`）。这个账号只能：按企业微信 userid 查员工的编号、姓名、用户、岗位；按岗位名查岗位职责；读假期类型和请假单；新建未提交的请假单；调 HRMS 的余额和审批人两个查询方法；用 POST 调员工前台的审批方法。其余一律 403。

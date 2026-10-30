@@ -38,6 +38,7 @@ class FakeHR:
         self.down = False
         self.reject: FrappeRejected | None = None
         self.created: list[dict[str, Any]] = []
+        self.decided: list[tuple[str, str, str]] = []
         # 岗位 → 功能开关；X1 升级后已有岗位的开关都是开，不在这里的岗位相当于不存在
         on = dict.fromkeys(TOOL_SWITCH_FIELDS, True)
         self.switches: dict[str, dict[str, bool | None]] = {"出纳": {**on}, "主管": {**on}}
@@ -94,3 +95,10 @@ class FakeHR:
 
     async def tool_switches(self, designation: str) -> dict[str, bool | None] | None:
         return self.switches.get(designation)
+
+    async def decide(self, wecom_userid: str, leave: str, action: str) -> dict[str, Any]:
+        self.decided.append((wecom_userid, leave, action))
+        # 只有李四是 HR-LAP-1 当前环节的审批人
+        if wecom_userid == "lisi" and leave == "HR-LAP-1":
+            return {"ok": True, "stage": "EB Leave HR"}
+        return {"ok": False, "reason": "forbidden"}
