@@ -20,8 +20,8 @@
 | enterprise_base（X1） | 0.1.0；安装于原固定组合，Frappe 镜像后缀 `-eb0.1.0` | 本仓库 Frappe App，GPL-3.0-only；不修改上游源码 |
 | policy-sync（X5） | `ghcr.io/jayq0720/enterprise-base-policy-sync@sha256:a58c658531701ad4d38deb7b5c6d46e3e36bcf059a0af73159ee7b47b8ef5dae`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；运行依赖许可证由 CI 检查 |
 | kb-gateway（X3） | `ghcr.io/jayq0720/enterprise-base-kb-gateway@sha256:cb8885d44b7bbf4c88a5fb539cd64b521fd07b74495650b165f6eeae8dc2cb78`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；运行依赖许可证由 CI 检查 |
-| frappe-mcp（X4） | `ghcr.io/jayq0720/enterprise-base-frappe-mcp@sha256:ac76771a51048e854864efcef2dbad6d80edf8e03eb6d07300796b797020d7d1`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；含岗位开关和员工前台接口 |
-| portal（X6 员工前台） | `ghcr.io/jayq0720/enterprise-base-portal@sha256:dca5e6fd3d9fc5634a467c93e9718a138375348bbdaac6fda2a474db09ad0207`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；依赖 starlette、httpx、pydantic、uvicorn（BSD-3/MIT） |
+| frappe-mcp（X4） | `ghcr.io/jayq0720/enterprise-base-frappe-mcp@sha256:5e4cf73ddb7c3aac565139c42ed510d3ba6181ea07c3590f6c33f81e287703d2`；[main cfdfdeb 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41063761200) | 本仓库独立服务；含岗位开关、员工前台接口和询盘工具 |
+| portal（X6 员工前台） | `ghcr.io/jayq0720/enterprise-base-portal@sha256:bf581559d40a507c787584b75b7a63e8c02d8b6b517312486355b92b107090b4`；[main cfdfdeb 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41063761200) | 本仓库独立服务；依赖 starlette、httpx、pydantic、uvicorn（BSD-3/MIT） |
 | X3/X4/X5 构建 Python / uv 镜像 | 3.12.12-slim-bookworm / 0.11.32 | PSF / MIT 或 Apache-2.0；仅官方 Python、Astral 镜像 |
 | age（备份加密工具） | 1.2.1；官方发布包及程序 SHA256 见 `age.lock.json` | BSD-3-Clause；[官方发布](https://github.com/FiloSottile/age/releases/tag/v1.2.1)，缓存保留原 LICENSE；支持 Linux amd64、macOS arm64 |
 
