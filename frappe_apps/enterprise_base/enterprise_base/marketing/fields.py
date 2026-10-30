@@ -1,11 +1,13 @@
 """询盘字段定义（不 import Frappe，hooks.py 导出 fixtures 时也要用）。"""
 
+from typing import Any
+
 CHANNELS = ("网站表单", "邮件", "电话", "在线聊天", "B2B 平台", "展会", "社媒", "其他")
 GRADES = ("A", "B", "C", "无效")
 
 
-def lead_fields():
-    fields = [
+def lead_fields() -> list[dict[str, Any]]:
+    fields: list[dict[str, Any]] = [
         dict(
             fieldname="eb_inquiry_section",
             label="询盘",
