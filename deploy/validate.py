@@ -60,13 +60,13 @@ def audit(model, stack):
     if stack == "frappe":
         for name in ("kb-gateway", "frappe-mcp"):
             service = model["services"][name]
-            require(bool(re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-" + name + r"@sha256:[a-f0-9]{64}", service["image"]))
+            require(bool(re.fullmatch(r"ghcr.io/jayq0720/enterprise-base-" + name + r"@sha256:[a-f0-9]{64}", service["image"]))
                     and set(service["networks"]) == {"default", "edge"}
                     and not service.get("network_mode") and not service.get("privileged"), "X3/X4 镜像或网络隔离错误。")
             require(service["healthcheck"]["test"] == ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"],
                     "X3/X4 健康检查必须 GET /healthz。")
         portal = model["services"]["portal"]
-        require(bool(re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:[a-f0-9]{64}", portal["image"]))
+        require(bool(re.fullmatch(r"ghcr.io/jayq0720/enterprise-base-portal@sha256:[a-f0-9]{64}", portal["image"]))
                 and set(portal["networks"]) == {"default", "edge"} and not portal.get("ports")
                 and not portal.get("network_mode") and not portal.get("privileged"), "员工前台镜像或网络隔离错误。")
     for service in model["services"].values():
@@ -187,7 +187,7 @@ def validate(work):
     require(all(values[k] == v for k, v in original.items() if k not in upgraded),
             "补齐服务密钥时覆盖了已有配置。")
     # 旧服务器上的镜像摘要过期时，重复 init 要改成当前代码的版本，且不动密钥。
-    stale = {**values, "EB_KB_GATEWAY_IMAGE": "ghcr.io/qianjie0720-sys/enterprise-base-kb-gateway@sha256:" + "0" * 64}
+    stale = {**values, "EB_KB_GATEWAY_IMAGE": "ghcr.io/jayq0720/enterprise-base-kb-gateway@sha256:" + "0" * 64}
     private.write_text("".join(f"{k}={v}\n" for k, v in stale.items()))
     prepare("init")
     require(settings(private) == {**values, "EB_KB_GATEWAY_IMAGE": settings(work / ".env.example")["EB_KB_GATEWAY_IMAGE"]},
@@ -225,10 +225,10 @@ def validate(work):
     prepare("portal", "secrets/.env", success=False)
     for defect, replacement in (("EB_PORTAL_WECOM_APP_SECRET", ""), ("EB_MCP_PORTAL_TOKEN", values["EB_MCP_SERVICE_TOKEN"]),
             ("EB_PORTAL_SESSION_SECRET", "short"), ("EB_PORTAL_IMAGE", "image:latest"),
-            ("EB_PORTAL_IMAGE", settings(work / ".env.example")["EB_PORTAL_IMAGE"])):
+            ("EB_PORTAL_IMAGE", "ghcr.io/jayq0720/enterprise-base-portal@sha256:" + "0" * 64)):
         incomplete.write_text("".join(f"{k}={replacement if k == defect else v}\n" for k, v in front.items()))
         prepare("portal", str(incomplete), success=False)
-    incomplete.write_text("".join(f"{k}={v}\n" for k, v in {**front, "EB_PORTAL_IMAGE": "ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:" + "a" * 64}.items()))
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in {**front, "EB_PORTAL_IMAGE": "ghcr.io/jayq0720/enterprise-base-portal@sha256:" + "a" * 64}.items()))
     prepare("portal", str(incomplete))
     values.update({key: assistant[key] for key in credentials})
     policy = dict(values)

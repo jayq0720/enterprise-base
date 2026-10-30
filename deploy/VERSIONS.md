@@ -18,9 +18,10 @@
 | dify-on-wechat | `hanfangyuan/dify-on-wechat@sha256:2ef2ecf9f081301fd34f9ceb4397f1d6cd6dac2eb42789285970a6f31752ad76` | [MIT](https://github.com/hanfangyuan4396/dify-on-wechat/blob/4685a7d89aa6881c14459037bc1d1564f84a9224/LICENSE)；官方发布镜像按摘要锁定，不声称与该源码提交完全一致 |
 | 部署脚本 PyYAML | 6.0.2 | MIT；通过 uv 独立运行，无服务端 Python 依赖变更 |
 | enterprise_base（X1） | 0.1.0；安装于原固定组合，Frappe 镜像后缀 `-eb0.1.0` | 本仓库 Frappe App，GPL-3.0-only；不修改上游源码 |
-| policy-sync（X5） | `sha256:7753056cf4f92798f6a96ab4815e616ef4cebda2cc9517e52b800da9fd2f876f`；[CI 发布记录](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38867670892)（main 4a1e1ff 构建） | 本仓库独立服务；运行依赖许可证由 CI 检查，不声明第三方授权 |
-| kb-gateway（X3） | `ghcr.io/qianjie0720-sys/enterprise-base-kb-gateway@sha256:41a8cd2a00c5f24c6fdbf0f5c3b6dead8eb880bf6c4e197d1663a7c88ef02d9b` | 本仓库独立服务；运行依赖许可证由 CI 检查，未新增依赖；[main 1f13089 发布产物](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/38879664692) |
-| frappe-mcp（X4） | `ghcr.io/qianjie0720-sys/enterprise-base-frappe-mcp@sha256:220cf801a18193cb40b5e1d0072e809c791db8b20e608eb850d9738c51082059` | 本仓库独立服务；运行依赖许可证由 CI 检查，未新增依赖；含 P2-C2 岗位开关及缺岗位/缺值拒绝；[main bb82cca 发布产物](https://github.com/qianjie0720-sys/enterprise-base/actions/runs/39188132593) |
+| policy-sync（X5） | `ghcr.io/jayq0720/enterprise-base-policy-sync@sha256:a58c658531701ad4d38deb7b5c6d46e3e36bcf059a0af73159ee7b47b8ef5dae`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；运行依赖许可证由 CI 检查 |
+| kb-gateway（X3） | `ghcr.io/jayq0720/enterprise-base-kb-gateway@sha256:cb8885d44b7bbf4c88a5fb539cd64b521fd07b74495650b165f6eeae8dc2cb78`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；运行依赖许可证由 CI 检查 |
+| frappe-mcp（X4） | `ghcr.io/jayq0720/enterprise-base-frappe-mcp@sha256:ac76771a51048e854864efcef2dbad6d80edf8e03eb6d07300796b797020d7d1`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；含岗位开关和员工前台接口 |
+| portal（X6 员工前台） | `ghcr.io/jayq0720/enterprise-base-portal@sha256:dca5e6fd3d9fc5634a467c93e9718a138375348bbdaac6fda2a474db09ad0207`；[main 22a6538 发布记录](https://github.com/jayq0720/enterprise-base/actions/runs/41010380499) | 本仓库独立服务；依赖 starlette、httpx、pydantic、uvicorn（BSD-3/MIT） |
 | X3/X4/X5 构建 Python / uv 镜像 | 3.12.12-slim-bookworm / 0.11.32 | PSF / MIT 或 Apache-2.0；仅官方 Python、Astral 镜像 |
 | age（备份加密工具） | 1.2.1；官方发布包及程序 SHA256 见 `age.lock.json` | BSD-3-Clause；[官方发布](https://github.com/FiloSottile/age/releases/tag/v1.2.1)，缓存保留原 LICENSE；支持 Linux amd64、macOS arm64 |
 
