@@ -8,18 +8,26 @@ from frappe.sessions import clear_sessions
 from hrms.overrides.employee_master import EmployeeMaster
 
 from enterprise_base.duties.tool_switches import FIELDS as TOOL_FIELDS
+from enterprise_base.marketing.inquiry import SWITCH_FIELDS as MARKETING_FIELDS
 
 PRIVILEGED = {"HR User", "HR Manager", "EB Integration", "EB X4"}
 # X4 只能按“=”精确查这几张表的这几个字段（只查列表，不取整条记录）
 X4_COLUMNS = {
     "Employee": {"name", "employee_name", "user_id", "wecom_userid", "designation"},
-    "Designation": {"name", "eb_responsibilities", *TOOL_FIELDS},
+    "Designation": {"name", "eb_responsibilities", *TOOL_FIELDS, *MARKETING_FIELDS},
 }
 X4_METHODS = {
     "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
     "hrms.hr.doctype.leave_application.leave_application.get_leave_approver",
 }
-X4_POST_METHOD = "enterprise_base.wecom.portal_actions.decide"
+# 写方法：员工前台审批，以及询盘方法（方法内再校验负责人本人，见 marketing/api.py）
+X4_POST_METHODS = {
+    "enterprise_base.wecom.portal_actions.decide",
+    *(
+        f"enterprise_base.marketing.api.{name}"
+        for name in ("intake", "my_inquiries", "inquiry", "follow_up", "stats")
+    ),
+}
 
 
 class Employee(EmployeeMaster):
@@ -151,7 +159,7 @@ def x4_api():
     called = path.removeprefix("/api/method/")
     # 员工前台的审批操作：方法内再按审批人本人校验，见 wecom/portal_actions.py
     allowed = (method == "GET" and called in X4_METHODS) or (
-        method == "POST" and called == X4_POST_METHOD
+        method == "POST" and called in X4_POST_METHODS
     )
     if parts[:3] == ["", "api", "resource"] and len(parts) in (4, 5):
         dt = parts[3]

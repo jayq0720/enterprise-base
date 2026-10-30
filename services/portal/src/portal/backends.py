@@ -26,6 +26,8 @@ class Api(Protocol):
 
     async def search(self, user_id: str, query: str) -> dict[str, Any]: ...
 
+    async def intake(self, authorization: str, body: bytes) -> tuple[int, dict[str, Any]]: ...
+
     async def chat(
         self, key: str, user_id: str, query: str, conversation_id: str
     ) -> dict[str, Any]: ...
@@ -87,6 +89,23 @@ class Backends:
             token,
             {**args, "user_id": user_id},
         )
+
+    async def intake(self, authorization: str, body: bytes) -> tuple[int, dict[str, Any]]:
+        """询盘进件原样转给 X4：Token 由网站后台带来，X4 校验，前台不保存。"""
+        try:
+            resp = await self._client.post(
+                str(self._s.x4_url).rstrip("/") + "/v1/inquiry/intake",
+                content=body,
+                headers={"Authorization": authorization, "Content-Type": "application/json"},
+                timeout=self._s.http_timeout_seconds,
+            )
+            data = resp.json()
+        except (httpx.HTTPError, ValueError) as e:
+            log.warning("backend unavailable: %s", type(e).__name__)
+            raise Unavailable from e
+        if not isinstance(data, dict) or resp.status_code not in (200, 401, 422):
+            raise Unavailable
+        return resp.status_code, data
 
     # —— X3 ——
     async def search(self, user_id: str, query: str) -> dict[str, Any]:

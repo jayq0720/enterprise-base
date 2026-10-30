@@ -19,6 +19,9 @@ LEAVE_DETAILS = f"{LEAVE_APP}.get_leave_details"
 LEAVE_APPROVER = f"{LEAVE_APP}.get_leave_approver"
 # X2 给员工前台的审批方法：以审批人本人身份走原生 Workflow，只有 X4 接口账号能调
 PORTAL_DECIDE = "enterprise_base.wecom.portal_actions.decide"
+# 询盘中心的方法（X1/X2 App 的 marketing/api.py）：只有 X4 接口账号能调，方法内校验负责人
+INQUIRY_API = "enterprise_base.marketing.api."
+INQUIRY_METHODS = ("intake", "my_inquiries", "inquiry", "follow_up", "stats")
 LEAVE_FIELDS = [
     "name",
     "employee_name",
@@ -39,6 +42,8 @@ TOOL_SWITCH_FIELDS = (
     "eb_tool_leave_apply",
     "eb_tool_approval",
     "eb_tool_duties",
+    "eb_tool_inquiry",
+    "eb_tool_inquiry_stats",
 )
 
 
@@ -48,6 +53,8 @@ class Employee(BaseModel):
     # Frappe 用户（邮箱），只在内部用来找“待我审批”，不返回给模型
     user_id: str | None
     designation: str | None = None
+    # 查这个员工用的企业微信 userid，询盘方法在 Frappe 里按它再校验一次本人
+    wecom_userid: str = ""
 
 
 class FrappeRejected(Exception):
@@ -78,6 +85,8 @@ class HR(Protocol):
 
     async def decide(self, wecom_userid: str, leave: str, action: str) -> dict[str, Any]: ...
 
+    async def inquiry_call(self, method: str, body: dict[str, Any]) -> dict[str, Any]: ...
+
 
 class FrappeHR:
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
@@ -104,6 +113,7 @@ class FrappeHR:
             employee_name=str(row.get("employee_name") or ""),
             user_id=row.get("user_id") or None,
             designation=row.get("designation") or None,
+            wecom_userid=wecom_userid,
         )
 
     async def leave_balance(self, employee: str, on: datetime.date) -> dict[str, Any]:
@@ -178,6 +188,17 @@ class FrappeHR:
             f"{self._base}/api/method/{PORTAL_DECIDE}",
             headers=self._headers,
             json={"userid": wecom_userid, "leave": leave, "action": action},
+        )
+        resp.raise_for_status()
+        result: dict[str, Any] = resp.json().get("message") or {}
+        return result
+
+    async def inquiry_call(self, method: str, body: dict[str, Any]) -> dict[str, Any]:
+        """调询盘方法，返回方法的结果（字典）。method 只能是 INQUIRY_METHODS 之一。"""
+        if method not in INQUIRY_METHODS:
+            raise ValueError(method)
+        resp = await self._client.post(
+            f"{self._base}/api/method/{INQUIRY_API}{method}", headers=self._headers, json=body
         )
         resp.raise_for_status()
         result: dict[str, Any] = resp.json().get("message") or {}

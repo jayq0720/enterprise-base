@@ -120,3 +120,22 @@ doc_events["Designation"]["validate"] = [
     "enterprise_base.duties.validation.validate_scope_name",
     "enterprise_base.duties.tool_switches.validate",
 ]
+
+from enterprise_base.marketing.fields import lead_fields  # noqa: E402
+
+# 营销：询盘中心（ERPNext Lead 上的字段和钩子）、营销助手岗位开关
+after_sync.append("enterprise_base.marketing.inquiry.configure")
+after_migrate.append("enterprise_base.marketing.inquiry.configure")
+doc_events["Lead"] = {
+    "before_insert": "enterprise_base.marketing.inquiry.before_insert",
+    "validate": "enterprise_base.marketing.inquiry.validate",
+}
+doc_events["Designation"]["validate"].append("enterprise_base.marketing.inquiry.validate_switches")
+fixtures[1]["filters"][0][2].extend(
+    [
+        "Designation-eb_marketing_tools_section",
+        "Designation-eb_tool_inquiry",
+        "Designation-eb_tool_inquiry_stats",
+        *(f"Lead-{field['fieldname']}" for field in lead_fields()),
+    ]
+)

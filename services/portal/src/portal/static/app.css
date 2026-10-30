@@ -79,6 +79,19 @@ input, select { font: inherit; padding: 7px 10px; border: 1px solid var(--line);
 .result { border-bottom: 1px solid var(--line); padding: 10px 0; }
 .result p { margin: 4px 0; white-space: pre-wrap; }
 
+.toolbar { display: flex; align-items: center; gap: 16px; justify-content: space-between; }
+.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.inline input { width: auto; }
+.narrow { width: auto; }
+.detail { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--line); }
+.detail h3 { margin-top: 16px; }
+.fields { display: grid; grid-template-columns: 9em 1fr; gap: 4px 12px; margin: 0; }
+.fields dt { color: var(--muted); }
+.fields dd { margin: 0; word-break: break-all; }
+.quote { white-space: pre-wrap; background: var(--bg); padding: 8px 12px; border-radius: 6px; }
+.notes { padding-left: 18px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: start; }
+
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
   .grid .wide { grid-column: auto; }

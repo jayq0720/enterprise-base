@@ -38,6 +38,10 @@ TOOL_SWITCHES = {
     "my_responsibilities": ("eb_tool_duties", "查岗位职责"),
     "leave_types": ("eb_tool_leave_apply", "发起请假"),
     "decide": ("eb_tool_approval", "查待我审批"),
+    "my_inquiries": ("eb_tool_inquiry", "处理询盘"),
+    "inquiry_detail": ("eb_tool_inquiry", "处理询盘"),
+    "follow_up_inquiry": ("eb_tool_inquiry", "处理询盘"),
+    "inquiry_stats": ("eb_tool_inquiry_stats", "查询盘统计"),
 }
 # 员工前台按这几个功能显示页面，键 → 岗位开关
 FEATURES = {
@@ -45,12 +49,40 @@ FEATURES = {
     "leave_apply": "eb_tool_leave_apply",
     "approval": "eb_tool_approval",
     "duties": "eb_tool_duties",
+    "inquiry": "eb_tool_inquiry",
+    "inquiry_stats": "eb_tool_inquiry_stats",
 }
 DECIDE_ERRORS = {
     "forbidden": "这张单不在你的待审批里，可能已经处理过了。",
     "rejected": "HR 系统没有接受这次审批，请稍后再试或联系 HR。",
     "invalid": "审批参数不对，请刷新页面后重试。",
 }
+# 询盘状态：ERPNext 线索状态 → 员工看到的说法
+INQUIRY_STATUS = {
+    "Lead": "新询盘",
+    "Open": "跟进中",
+    "Replied": "已回复",
+    "Interested": "有意向",
+    "Opportunity": "已转商机",
+    "Quotation": "已报价",
+    "Lost Quotation": "报价未成",
+    "Converted": "已成交",
+    "Do Not Contact": "无效/不再联系",
+}
+# 员工能自己改到的状态（转商机、报价、成交走 ERPNext 原生操作）
+FOLLOW_UP_STATUS = {
+    "跟进中": "Open",
+    "已回复": "Replied",
+    "有意向": "Interested",
+    "无效": "Do Not Contact",
+}
+INQUIRY_ERRORS = {
+    "forbidden": "这条询盘不在你名下，或者已经不存在。",
+    "invalid": "状态只能是：跟进中、已回复、有意向、无效；或者写一句跟进记录。",
+    "rejected": "系统没有接受这次更新，请稍后再试。",
+    "no_contact": "询盘至少要有邮箱或电话。",
+}
+MAX_INQUIRY_ID = 140
 # 岗位职责是 HR 录的富文本，转成纯文本后最多给模型这么多字
 MAX_DUTIES = 3000
 
@@ -272,6 +304,115 @@ class Tools:
         result.setdefault("ok", False)
         return result
 
+    async def my_inquiries(
+        self, session_token: str, include_closed: bool = False
+    ) -> dict[str, Any]:
+        async def run(emp: Employee) -> dict[str, Any]:
+            result = await self._inquiry(
+                "my_inquiries", emp, scope="all" if include_closed else "open"
+            )
+            if result.get("ok"):
+                result["inquiries"] = [_inquiry(r) for r in result.get("inquiries", [])]
+            return result
+
+        return await self._as_user(session_token, run, "my_inquiries")
+
+    async def inquiry_detail(
+        self, session_token: str, inquiry_id: str, contact: bool = False
+    ) -> dict[str, Any]:
+        """询盘详情。contact=True 才带客户邮箱电话，只给员工前台用，MCP 工具不开这个参数。"""
+
+        async def run(emp: Employee) -> dict[str, Any]:
+            result = await self._inquiry(
+                "inquiry", emp, lead=inquiry_id.strip()[:MAX_INQUIRY_ID], contact=int(contact)
+            )
+            if result.get("ok"):
+                row = result.get("inquiry") or {}
+                detail = _inquiry(row)
+                detail.update(
+                    {
+                        "language": row.get("language") or "",
+                        "quantity": row.get("eb_quantity") or "",
+                        "timeline": row.get("eb_timeline") or "",
+                        "requirement": row.get("eb_requirement") or "",
+                        "score_reasons": row.get("eb_score_reasons") or "",
+                        "website": row.get("website") or "",
+                        "source": {
+                            "landing_page": row.get("eb_landing_page") or "",
+                            "keyword": row.get("eb_keyword") or "",
+                            "ai_engine": row.get("eb_ai_engine") or "",
+                            "utm_source": row.get("eb_utm_source") or "",
+                            "utm_medium": row.get("eb_utm_medium") or "",
+                            "utm_campaign": row.get("eb_utm_campaign") or "",
+                        },
+                    }
+                )
+                if contact:
+                    detail["contact"] = {
+                        "email": row.get("email_id") or "",
+                        "phone": row.get("mobile_no") or row.get("phone") or "",
+                    }
+                result = {"ok": True, "inquiry": detail, "notes": result.get("notes", [])}
+            return result
+
+        return await self._as_user(session_token, run, "inquiry_detail")
+
+    async def follow_up_inquiry(
+        self, session_token: str, inquiry_id: str, status: str = "", note: str = ""
+    ) -> dict[str, Any]:
+        async def run(emp: Employee) -> dict[str, Any]:
+            label = status.strip()
+            key = FOLLOW_UP_STATUS.get(label, label if label in FOLLOW_UP_STATUS.values() else "")
+            if label and not key:
+                return {"ok": False, "error": INQUIRY_ERRORS["invalid"]}
+            result = await self._inquiry(
+                "follow_up",
+                emp,
+                lead=inquiry_id.strip()[:MAX_INQUIRY_ID],
+                status=key,
+                note=note.strip()[:1000],
+            )
+            if result.get("ok"):
+                now = INQUIRY_STATUS.get(str(result.get("status")), str(result.get("status")))
+                return {
+                    "ok": True,
+                    "message": f"已更新询盘 {inquiry_id.strip()}，当前状态：{now}。",
+                }
+            return result
+
+        return await self._as_user(session_token, run, "follow_up_inquiry")
+
+    async def inquiry_stats(self, session_token: str, days: int = 30) -> dict[str, Any]:
+        async def run(emp: Employee) -> dict[str, Any]:
+            result = await self._inquiry("stats", emp, days=max(1, min(int(days), 366)))
+            if result.get("ok"):
+                result["by_status"] = {
+                    INQUIRY_STATUS.get(k, k): v for k, v in (result.get("by_status") or {}).items()
+                }
+            return result
+
+        return await self._as_user(session_token, run, "inquiry_stats")
+
+    async def intake(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """外部渠道进件（不经过员工身份），只回询盘号、是否重复和等级。"""
+        try:
+            result = await self._hr.inquiry_call("intake", {"data": payload})
+        except httpx.HTTPError as e:
+            log.warning("frappe unavailable: %s", type(e).__name__)
+            return {"ok": False, "error": "询盘系统暂时不可用，请稍后重试。"}
+        if not result.get("ok"):
+            reason = str(result.get("reason") or "invalid")
+            return {"ok": False, "error": INQUIRY_ERRORS.get(reason, INQUIRY_ERRORS["rejected"])}
+        return {k: result[k] for k in ("ok", "id", "duplicate", "grade") if k in result}
+
+    async def _inquiry(self, method: str, emp: Employee, **body: Any) -> dict[str, Any]:
+        # 身份只用会话令牌里验过的那个员工的 userid，参数里不收身份
+        result = await self._hr.inquiry_call(method, {"userid": emp.wecom_userid, **body})
+        if result.get("ok") is True:
+            return result
+        reason = str(result.get("reason") or "rejected")
+        return {"ok": False, "error": INQUIRY_ERRORS.get(reason, INQUIRY_ERRORS["rejected"])}
+
     async def _as_user(
         self, token: str, run: Callable[[Employee], Any], tool: str
     ) -> dict[str, Any]:
@@ -313,6 +454,23 @@ class Tools:
 
 STATE_MANAGER, STATE_HR, STATE_RETURNED = "EB Leave Manager", "EB Leave HR", "EB Leave Returned"
 _STAGES = {STATE_MANAGER: "manager", STATE_HR: "hr", STATE_RETURNED: "returned"}
+
+
+def _inquiry(r: dict[str, Any]) -> dict[str, Any]:
+    status = str(r.get("status") or "")
+    return {
+        "id": r.get("name") or "",
+        "customer": r.get("lead_name") or "",
+        "company": r.get("company_name") or "",
+        "country": r.get("country") or "",
+        "status": INQUIRY_STATUS.get(status, status),
+        "channel": r.get("eb_channel") or "",
+        "grade": r.get("eb_grade") or "",
+        "score": r.get("eb_score") or 0,
+        "product": r.get("eb_product") or "",
+        "received_at": str(r.get("creation") or "")[:16],
+        "responded": bool(r.get("eb_first_response_at")),
+    }
 
 
 def _leave(r: dict[str, Any]) -> dict[str, Any]:

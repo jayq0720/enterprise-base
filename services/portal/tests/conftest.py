@@ -56,6 +56,7 @@ class FakeBackends:
         self.x4_calls: list[tuple[str, str, dict[str, str]]] = []
         self.chats: list[tuple[str, str, str, str]] = []
         self.searches: list[tuple[str, str]] = []
+        self.intakes: list[tuple[str, bytes]] = []
         self.down = False
         self.missing_conversation = False
 
@@ -69,6 +70,14 @@ class FakeBackends:
         if name == "profile":
             return self.employees.get(user_id, {"ok": False, "error": "未找到"})
         return {"tool": name, "employee_name": self.employees[user_id]["employee_name"]}
+
+    async def intake(self, authorization: str, body: bytes) -> tuple[int, dict[str, Any]]:
+        if self.down:
+            raise Unavailable
+        self.intakes.append((authorization, body))
+        if authorization != "Bearer " + "i" * 40:
+            return 401, {"error": "unauthorized"}
+        return 200, {"ok": True, "id": "CRM-LEAD-2", "duplicate": False, "grade": "B"}
 
     async def search(self, user_id: str, query: str) -> dict[str, Any]:
         self.searches.append((user_id, query))

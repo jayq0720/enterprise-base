@@ -18,6 +18,7 @@ os.umask(0o077)
 LOCK = json.loads(Path("upstream.lock.json").read_text())
 ASSISTANT_SECRETS = ("EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET")
 PORTAL_SECRETS = ("EB_PORTAL_SESSION_SECRET", "EB_MCP_PORTAL_TOKEN")
+INTAKE_SECRET = "EB_MCP_INTAKE_TOKEN"
 PORTAL_INPUTS = ("EB_PORTAL_WECOM_CORP_ID", "EB_PORTAL_WECOM_AGENT_ID", "EB_PORTAL_WECOM_APP_SECRET")
 MODES = {"check", "wechat", "policy-sync", "hr-assistant", "portal"}
 
@@ -55,7 +56,7 @@ if mode == "init":
         values = env("secrets/.env")
         for key, value in values.items():
             if value == "__GENERATE__":
-                values[key] = secrets.token_urlsafe(32) if key in {"DIFY_AGENT_SERVER_SECRET_KEY", "EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", *ASSISTANT_SECRETS, *PORTAL_SECRETS} else secrets.token_hex(32)
+                values[key] = secrets.token_urlsafe(32) if key in {"DIFY_AGENT_SERVER_SECRET_KEY", "EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", *ASSISTANT_SECRETS, *PORTAL_SECRETS, INTAKE_SECRET} else secrets.token_hex(32)
         write("secrets/.env", "".join(f"{k}={v}\n" for k, v in values.items()))
     else:
         values = env("secrets/.env")
@@ -121,6 +122,10 @@ if mode in MODES:
         tokens = [settings[k] for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS)]
         if len(set(tokens)) != len(tokens) or any(len(settings[k]) < 32 for k in PORTAL_SECRETS):
             sys.exit("员工前台两项密钥须与 X3/X4 密钥互不相同且各至少 32 位。")
+        # 询盘进件 Token 可留空（不开进件）；填了就必须独立且至少 32 位
+        intake = settings.get(INTAKE_SECRET, "")
+        if intake and (len(intake) < 32 or intake in tokens):
+            sys.exit("询盘进件 Token 须与其它密钥互不相同且至少 32 位。")
     sys.exit()
 if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", settings["EB_PROJECT"]) or not re.fullmatch(r"[a-zA-Z0-9.-]+", settings["EB_DOMAIN"]):
     sys.exit("项目名或域名格式错误。")
@@ -230,7 +235,7 @@ for service, directory, prefix in (("kb-gateway", "kb_gateway", "EB_KB"), ("frap
                       EB_DIFY_DATASET_API_KEY=settings.get("EB_KB_DIFY_DATASET_API_KEY", ""),
                       EB_DIFY_SEARCH_METHOD=settings.get("EB_KB_DIFY_SEARCH_METHOD", "hybrid_search"))
     else:
-        config.update({k: settings.get(k, "") for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS) if k.startswith("EB_MCP_")})
+        config.update({k: settings.get(k, "") for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS, INTAKE_SECRET) if k.startswith("EB_MCP_")})
         config["EB_MCP_ALLOWED_HOSTS"] = '["frappe-mcp:8080"]'
     write(f"secrets/{service}.env", "".join(f"{k}={v}\n" for k, v in config.items()))
     hr["services"][service]["env_file"] = [str(ROOT / f"secrets/{service}.env")]
