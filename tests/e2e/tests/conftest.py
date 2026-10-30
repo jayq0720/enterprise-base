@@ -1,8 +1,10 @@
 """没配置测试环境（EB_E2E_FRAPPE_URL 为空）时整套跳过，CI 里只做静态检查。"""
 
+import datetime
 import os
 import warnings
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 import pytest
 from pydantic import ValidationError
@@ -56,6 +58,66 @@ def hr(settings: E2ESettings) -> HRAssistant:
     if settings.hr_app_key is None:
         pytest.skip("未配置 EB_E2E_HR_APP_KEY，跳过 HR 助手对话测试")
     return HRAssistant(settings, settings.hr_app_key.get_secret_value())
+
+
+@dataclass
+class Flow:
+    hr_wecom: str
+    hr_user: str
+
+
+@pytest.fixture(scope="session")
+def flow(settings: E2ESettings, frappe: Frappe, world: World) -> Iterator[Flow]:
+    """两级审批要的人和权限：B 加请假审批人角色，新建 HR 审批人 C，给 A 分配假期。"""
+    tag = world.tag
+    email = f"{tag.lower()}-c@example.invalid"
+    user = str(
+        frappe.insert(
+            "User",
+            {
+                "email": email,
+                "first_name": f"{tag}C",
+                "send_welcome_email": 0,
+                "roles": [{"role": "Employee"}, {"role": "HR User"}],
+            },
+        )["name"]
+    )
+    world.cleanup.append(lambda: frappe.delete("User", user))
+    hr_wecom = f"{tag.lower()}-c"
+    employee = str(
+        frappe.insert(
+            "Employee",
+            {
+                "first_name": f"{tag}C",
+                "gender": "Male",
+                "date_of_birth": "1990-01-01",
+                "date_of_joining": f"{datetime.date.today().year - 1}-01-01",
+                "company": world.company,
+                "department": world.department,
+                "designation": world.b.designation,
+                "status": "Active",
+                "user_id": user,
+                "wecom_userid": hr_wecom,
+                "create_user_permission": 0,
+            },
+        )["name"]
+    )
+    world.cleanup.append(lambda: frappe.delete("Employee", employee))
+    b_roles = frappe.get("User", world.b.user)["roles"]
+    frappe.update(
+        "User",
+        world.b.user,
+        {"roles": [{"role": r["role"]} for r in b_roles] + [{"role": "Leave Approver"}]},
+    )
+    frappe.update("Employee", world.a.employee, {"eb_hr_approver": user})
+
+    def unlink_hr() -> None:
+        # 不先解除，删 C 的用户时会因为还被 A 的档案引用而失败
+        frappe.update("Employee", world.a.employee, {"eb_hr_approver": None})
+
+    world.cleanup.append(unlink_hr)
+    world.allocate_leave(frappe, settings.leave_type)
+    yield Flow(hr_wecom=hr_wecom, hr_user=user)
 
 
 def assert_clean(world: World, *outputs: object) -> None:
