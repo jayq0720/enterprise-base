@@ -205,6 +205,12 @@ def test_logs_have_no_identity(settings: Settings, caplog: pytest.LogCaptureFixt
         assert value not in text
 
 
+def test_blank_dify_key_means_chat_off(settings: Settings) -> None:
+    data = {**settings.model_dump(), "dify_hr_app_key": "", "dify_policy_app_key": " "}
+    blank = Settings(**data)
+    assert blank.dify_hr_app_key is None and blank.dify_policy_app_key is None
+
+
 def test_public_url_must_be_https(settings: Settings) -> None:
     data = settings.model_dump()
     with pytest.raises(ValueError):
