@@ -29,6 +29,7 @@ HOLD = {
     "policy-sync",
     "kb-gateway",
     "frappe-mcp",
+    "portal",
 }
 
 

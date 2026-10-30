@@ -121,7 +121,7 @@ class Runtime(Target):
             [
                 n
                 for n in self.selected["hr"]
-                if n not in {"configurator", "policy-sync", "kb-gateway", "frappe-mcp"}
+                if n not in {"configurator", "policy-sync", "kb-gateway", "frappe-mcp", "portal"}
             ],
         )
         self.step = "Dify启动"
@@ -129,7 +129,11 @@ class Runtime(Target):
         self.step = "接口服务启动"
         self.start(
             "hr",
-            [n for n in self.selected["hr"] if n in {"policy-sync", "kb-gateway", "frappe-mcp"}],
+            [
+                n
+                for n in self.selected["hr"]
+                if n in {"policy-sync", "kb-gateway", "frappe-mcp", "portal"}
+            ],
         )
         self.step = "企业微信入口"
         self.start("edge", self.selected["edge"])
@@ -165,7 +169,7 @@ class Runtime(Target):
         ]
         probes += [
             ("hr", name, "python", "http://127.0.0.1:8080/healthz", name + ":8080")
-            for name in ("policy-sync", "kb-gateway", "frappe-mcp")
+            for name in ("policy-sync", "kb-gateway", "frappe-mcp", "portal")
             if name in self.selected["hr"]
         ]
         for stack, name, python, url, host in probes:

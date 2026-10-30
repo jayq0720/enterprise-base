@@ -211,3 +211,6 @@ def test_public_url_must_be_https(settings: Settings) -> None:
         Settings(**{**data, "public_url": "http://portal.example.com"})
     with pytest.raises(ValueError):
         Settings(**{**data, "public_url": "https://portal.example.com/app"})
+    with pytest.raises(ValueError):
+        Settings(**{**data, "public_url": "http://localhost.example.com"})
+    Settings(**{**data, "public_url": "http://portal.localhost"})

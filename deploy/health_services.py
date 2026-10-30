@@ -144,7 +144,7 @@ def check(containers, config, thresholds, run=command):
     ]
     probes += [
         ("hr", name, "python", "http://127.0.0.1:8080/healthz", name + ":8080")
-        for name in ("policy-sync", "kb-gateway", "frappe-mcp")
+        for name in ("policy-sync", "kb-gateway", "frappe-mcp", "portal")
         if ("hr", name) in containers
     ]
     for stack, name, python, url, host in probes:

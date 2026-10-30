@@ -121,6 +121,8 @@ def release(revision):
                 raise ValueError("运行App镜像缺少匹配的部署提交标签")
             for key, service in state.IMAGE_KEYS.items():
                 name = "-hr/" + service
+                if name in active and key not in plan["before"]["images"]:
+                    raise ValueError("运行镜像与基线配置不一致")
                 if (
                     name in active
                     and command(

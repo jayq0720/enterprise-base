@@ -40,8 +40,10 @@ class Settings(BaseSettings):
     @field_validator("public_url")
     @classmethod
     def _https(cls, v: HttpUrl) -> HttpUrl:
-        # 本机调试允许 http://localhost，其余必须 https（Cookie 带 Secure）
-        if v.scheme != "https" and v.host not in ("localhost", "127.0.0.1"):
+        # 本机调试允许 http://localhost、http://*.localhost，其余必须 https（Cookie 带 Secure）
+        host = v.host or ""
+        local = host in ("localhost", "127.0.0.1") or host.endswith(".localhost")
+        if v.scheme != "https" and not local:
             raise ValueError("EB_PORTAL_PUBLIC_URL 必须是 https")
         if v.path not in (None, "", "/") or v.query or v.fragment:
             raise ValueError("EB_PORTAL_PUBLIC_URL 只写协议和域名")

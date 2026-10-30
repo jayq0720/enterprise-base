@@ -17,6 +17,9 @@ os.chdir(ROOT)
 os.umask(0o077)
 LOCK = json.loads(Path("upstream.lock.json").read_text())
 ASSISTANT_SECRETS = ("EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET")
+PORTAL_SECRETS = ("EB_PORTAL_SESSION_SECRET", "EB_MCP_PORTAL_TOKEN")
+PORTAL_INPUTS = ("EB_PORTAL_WECOM_CORP_ID", "EB_PORTAL_WECOM_AGENT_ID", "EB_PORTAL_WECOM_APP_SECRET")
+MODES = {"check", "wechat", "policy-sync", "hr-assistant", "portal"}
 
 
 def env(path):
@@ -52,12 +55,12 @@ if mode == "init":
         values = env("secrets/.env")
         for key, value in values.items():
             if value == "__GENERATE__":
-                values[key] = secrets.token_urlsafe(32) if key in {"DIFY_AGENT_SERVER_SECRET_KEY", "EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", *ASSISTANT_SECRETS} else secrets.token_hex(32)
+                values[key] = secrets.token_urlsafe(32) if key in {"DIFY_AGENT_SERVER_SECRET_KEY", "EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", *ASSISTANT_SECRETS, *PORTAL_SECRETS} else secrets.token_hex(32)
         write("secrets/.env", "".join(f"{k}={v}\n" for k, v in values.items()))
     else:
         values = env("secrets/.env")
         with Path("secrets/.env").open("a") as target:
-            defaults = {k: v for k, v in env(".env.example").items() if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_"))}
+            defaults = {k: v for k, v in env(".env.example").items() if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_", "EB_PORTAL_"))}
             defaults.update(EB_SYNC_WEBHOOK_SECRET="CHANGE_ME", EB_SYNC_SERVICE_TOKEN="CHANGE_ME")
             for key, value in defaults.items():
                 if key not in values:
@@ -71,7 +74,7 @@ if mode == "init":
             print("已把 X3/X4/X5 镜像摘要更新为当前代码中的版本。")
     print("已初始化 secrets/.env（未打印密钥）；再次运行不会覆盖密钥。")
     sys.exit()
-settings = env(sys.argv[2] if mode in {"check", "wechat", "policy-sync", "hr-assistant"} else mode)
+settings = env(sys.argv[2] if mode in MODES else mode)
 callback_mode = settings.get("EB_WECOM_CALLBACK_MODE", "bridge")
 if callback_mode not in {"bridge", "approvals"} or (callback_mode == "approvals" and settings.get("EB_SCHEME") != "https"):
     sys.exit("企业微信回调模式仅允许 bridge 或 approvals；approvals 必须使用 HTTPS。")
@@ -87,8 +90,10 @@ if mode != "wechat":
     if (not re.fullmatch(r"[A-Za-z0-9_-]{43}", agent_key)
             or base64.urlsafe_b64encode(base64.urlsafe_b64decode(agent_key + "=")).decode().rstrip("=") != agent_key):
         sys.exit("DIFY_AGENT_SERVER_SECRET_KEY 必须是 32 字节无填充 base64url；旧测试环境修复步骤见 LOCAL.md。")
-if mode in {"check", "wechat", "policy-sync", "hr-assistant"}:
+if mode in MODES:
     keys = required if mode == "check" else ([k for k in env(".env.example") if k.startswith("WECHAT") or k == "DIFY_API_KEY"] if mode == "wechat" else ["EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", "EB_SYNC_FRAPPE_API_KEY", "EB_SYNC_FRAPPE_API_SECRET", "EB_SYNC_DIFY_DATASET_API_KEY"])
+    if mode == "portal":
+        keys = [*ASSISTANT_SECRETS, *PORTAL_SECRETS, *PORTAL_INPUTS]
     if mode == "hr-assistant":
         keys = [*ASSISTANT_SECRETS, "EB_KB_FRAPPE_API_KEY", "EB_KB_FRAPPE_API_SECRET", "EB_KB_DIFY_DATASET_API_KEY", "EB_MCP_FRAPPE_API_KEY", "EB_MCP_FRAPPE_API_SECRET"]
     if any(not settings.get(k) or settings[k] == "CHANGE_ME" for k in keys):
@@ -109,6 +114,13 @@ if mode in {"check", "wechat", "policy-sync", "hr-assistant"}:
             sys.exit("X3/X4 必须使用各自专用账号的 API Key。")
         if settings.get("EB_KB_DIFY_SEARCH_METHOD", "hybrid_search") not in {"hybrid_search", "semantic_search", "keyword_search"}:
             sys.exit("X3 检索方式无效。")
+    if mode == "portal":
+        if (not re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:[a-f0-9]{64}", settings.get("EB_PORTAL_IMAGE", ""))
+                or set(settings["EB_PORTAL_IMAGE"].rsplit(":", 1)[1]) == {"0"}):
+            sys.exit("员工前台必须使用本仓库 main CI 发布的 SHA256 镜像摘要。")
+        tokens = [settings[k] for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS)]
+        if len(set(tokens)) != len(tokens) or any(len(settings[k]) < 32 for k in PORTAL_SECRETS):
+            sys.exit("员工前台两项密钥须与 X3/X4 密钥互不相同且各至少 32 位。")
     sys.exit()
 if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", settings["EB_PROJECT"]) or not re.fullmatch(r"[a-zA-Z0-9.-]+", settings["EB_DOMAIN"]):
     sys.exit("项目名或域名格式错误。")
@@ -218,10 +230,18 @@ for service, directory, prefix in (("kb-gateway", "kb_gateway", "EB_KB"), ("frap
                       EB_DIFY_DATASET_API_KEY=settings.get("EB_KB_DIFY_DATASET_API_KEY", ""),
                       EB_DIFY_SEARCH_METHOD=settings.get("EB_KB_DIFY_SEARCH_METHOD", "hybrid_search"))
     else:
-        config.update({k: settings.get(k, "") for k in ASSISTANT_SECRETS if k.startswith("EB_MCP_")})
+        config.update({k: settings.get(k, "") for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS) if k.startswith("EB_MCP_")})
         config["EB_MCP_ALLOWED_HOSTS"] = '["frappe-mcp:8080"]'
     write(f"secrets/{service}.env", "".join(f"{k}={v}\n" for k, v in config.items()))
     hr["services"][service]["env_file"] = [str(ROOT / f"secrets/{service}.env")]
+portal = env(ROOT.parent / "services/portal/.env.example")
+portal.update({k: settings.get(k, "") for k in portal if k in settings})
+portal.update(EB_PORTAL_PUBLIC_URL=f'{settings["EB_SCHEME"]}://portal.{settings["EB_DOMAIN"]}',
+              EB_PORTAL_X4_URL="http://frappe-mcp:8080", EB_PORTAL_X4_PORTAL_TOKEN=settings.get("EB_MCP_PORTAL_TOKEN", ""),
+              EB_PORTAL_X3_URL="http://kb-gateway:8080", EB_PORTAL_X3_TOKEN=settings.get("EB_KB_SERVICE_TOKEN", ""),
+              EB_PORTAL_DIFY_API_BASE="http://dify/v1")
+write("secrets/portal.env", "".join(f"{k}={v}\n" for k, v in portal.items()))
+hr["services"]["portal"]["env_file"] = [str(ROOT / "secrets/portal.env")]
 write("secrets/frappe-integration.env", f'EB_SYNC_WEBHOOK_SECRET={settings.get("EB_SYNC_WEBHOOK_SECRET", "")}\n')
 cfg = hr["services"]["configurator"]
 cfg["environment"].update(DB_HOST="db", DB_PORT="3306", REDIS_CACHE="redis-cache:6379", REDIS_QUEUE="redis-queue:6379")

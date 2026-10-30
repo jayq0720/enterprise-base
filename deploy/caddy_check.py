@@ -81,6 +81,14 @@ def check_routes(config, environment, bind, callback_mode="bridge"):
         proxy = chain[-1]
         need(not proxy.get("match") and proxy["handle"][0]["handler"] == "reverse_proxy")
         need(proxy["handle"][0]["upstreams"] == [{"dial": upstream}])
+    # 员工前台对员工开放：不带来源限制，只代理到前台，限制请求体
+    host = urlsplit(environment["PORTAL_ADDRESS"]).hostname
+    sites = [r for r in routes if r.get("match") == [{"host": [host]}]]
+    need(len(sites) == 1)
+    parts = list(nodes(sites[0]))
+    need(not any("remote_ip" in n for n in parts))
+    need([n["upstreams"] for n in parts if n.get("handler") == "reverse_proxy"] == [[{"dial": "portal:8080"}]])
+    need([n.get("max_size") for n in parts if n.get("handler") == "request_body"] == [65536])
     host = urlsplit(environment["WECOM_ADDRESS"]).hostname
     sites = [r for r in routes if r.get("match") == [{"host": [host]}]]
     need(len(sites) == 1)

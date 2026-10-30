@@ -87,6 +87,25 @@ class StateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             state.load(path)
 
+    def test_release_from_version_without_portal(self):
+        # 旧版本没有前台：配置里多出的前台镜像（例如回退后留下的）不影响比对，目标版本带上前台
+        self.git("checkout", "--detach", self.target)
+        old = "".join(f"{k}={v}\n" for k, v in self.pins.items() if k != "EB_PORTAL_IMAGE")
+        self.example.write_text(old)
+        self.git("commit", "-am", "合成无前台版本")
+        before = self.git("rev-parse", "HEAD").decode().strip()
+        portal = self.pins["EB_PORTAL_IMAGE"].replace("a" * 64, "b" * 64)
+        self.example.write_text(old.replace("a" * 64, "b" * 64) + f"EB_PORTAL_IMAGE={portal}\n")
+        self.git("commit", "-am", "合成加前台版本")
+        target = self.git("rev-parse", "HEAD").decode().strip()
+        self.git("update-ref", "refs/remotes/origin/main", target)
+        self.git("checkout", "--detach", before)
+        plan = state.plan(self.repo, target, self.env)
+        self.assertIn("EB_PORTAL_IMAGE", plan["target"]["images"])
+        self.env.write_text(self.env.read_text().replace("EB_POLICY_SYNC_IMAGE=", "EB_POLICY_SYNC_IMAGE=x"))
+        with self.assertRaises(ValueError):
+            state.plan(self.repo, target, self.env)
+
     def test_dirty_worktree_pr_commit_wrong_service_floating_pin_and_permissions_refused(self):
         stray = self.repo / "untracked"
         stray.touch()
@@ -99,6 +118,16 @@ class StateTests(unittest.TestCase):
         self.env.chmod(0o600)
         for value in ("ghcr.io/example/service:latest", self.pins["EB_POLICY_SYNC_IMAGE"]):
             bad = dict(self.pins, EB_KB_GATEWAY_IMAGE=value)
+            with self.assertRaises(ValueError):
+                state.images(bad)
+        # 员工前台可选；其它服务缺项、未知镜像项或前台镜像对不上都拒绝
+        core = {k: v for k, v in self.pins.items() if k != "EB_PORTAL_IMAGE"}
+        self.assertEqual(state.images(core), core)
+        for bad in (
+            {k: v for k, v in core.items() if k != "EB_KB_GATEWAY_IMAGE"},
+            dict(self.pins, EB_OTHER_IMAGE=self.pins["EB_PORTAL_IMAGE"]),
+            dict(self.pins, EB_PORTAL_IMAGE=self.pins["EB_FRAPPE_MCP_IMAGE"]),
+        ):
             with self.assertRaises(ValueError):
                 state.images(bad)
         self.git("checkout", "--orphan", "preview")

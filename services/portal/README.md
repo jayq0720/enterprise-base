@@ -37,7 +37,7 @@
 
 见 `.env.example`。企业微信应用可以和 X2 扫码登录用同一个，要在企业微信后台把前台域名加进应用的“可信域名”和“企业微信授权登录”回调域。X4 要配 `EB_MCP_PORTAL_TOKEN`（和 Dify 用的 Token 不同），否则前台接口一律 401。
 
-部署：域名建议 `portal.<客户域名>`，经 Caddy 对员工开放（不加管理员 IP 白名单），反向代理到本服务 8080 端口；本服务要能访问 `frappe-mcp`、`kb-gateway` 和 Dify 的 `dify` 内网别名。部署脚本的接入见任务卡 `docs/task-cards/P3-G4-员工前台部署.md`。
+部署：域名建议 `portal.<客户域名>`，经 Caddy 对员工开放（不加管理员 IP 白名单），反向代理到本服务 8080 端口；本服务要能访问 `frappe-mcp`、`kb-gateway` 和 Dify 的 `dify` 内网别名。部署步骤见 `deploy/LOCAL.md` 的“员工前台（X6）”一节（`make portal`）。
 
 ## 本地开发
 
