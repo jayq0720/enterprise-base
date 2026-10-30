@@ -294,6 +294,26 @@ async function loadStats() {
     }
     box.appendChild(table);
   }
+  const funnel = r.funnel;
+  if (!funnel) return;
+  const all = funnel.all;
+  $("#stats-summary").textContent += ` 其中有效 ${all.valid} 条，转商机 ${all.opportunity} 条，成交 ${all.won} 条，成交额 ${money(all.revenue)} ${r.currency || ""}。`;
+  for (const [key, title] of [["by_channel", "转化：按渠道"], ["by_ai_engine", "转化：按 AI 引擎来源"]]) {
+    const table = document.createElement("table");
+    table.className = "wide";
+    const head = table.createTHead().insertRow();
+    for (const h of [title, "询盘", "有效", "已跟进", "转商机", "成交", "成交额"]) cell(head, h);
+    const body = table.createTBody();
+    for (const [k, v] of Object.entries(funnel[key] || {})) {
+      const tr = body.insertRow();
+      for (const value of [k, v.total, v.valid, v.responded, v.opportunity, v.won, money(v.revenue)]) cell(tr, value);
+    }
+    box.appendChild(table);
+  }
+}
+
+function money(n) {
+  return Number(n || 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 }
 
 // —— 岗位职责、知识检索 ——
@@ -340,7 +360,29 @@ function openTab(id, me) {
   if (loaders[id]) loaders[id](me).catch(fail);
 }
 
+// 企业微信提醒里的“去处理”链接是 /#inquiry=询盘号；登录跳转会丢掉 #，先记下来
+const DEEP = "eb-open-inquiry";
+function rememberDeepLink() {
+  const m = /^#inquiry=([A-Za-z0-9.-]{1,140})$/.exec(location.hash);
+  try {
+    if (m) sessionStorage.setItem(DEEP, m[1]);
+    const id = sessionStorage.getItem(DEEP);
+    return id;
+  } catch {
+    return m ? m[1] : null;
+  }
+}
+
+function forgetDeepLink() {
+  try {
+    sessionStorage.removeItem(DEEP);
+  } catch {
+    // 浏览器禁用存储时没有可清的
+  }
+}
+
 async function start() {
+  const deep = rememberDeepLink();
   let me;
   try {
     me = await api("/api/me");
@@ -373,7 +415,11 @@ async function start() {
     await api("/auth/logout", {}).catch(() => {});
     location.replace("/");
   });
-  if (tabs.length) openTab(tabs[0].id, me);
+  if (deep && me.features.inquiry) {
+    forgetDeepLink();
+    openTab("inquiry", me);
+    showInquiry(deep).catch(fail);
+  } else if (tabs.length) openTab(tabs[0].id, me);
 }
 
 document.addEventListener("DOMContentLoaded", start);
