@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>员工服务台</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <section id="login" class="login" hidden>
+    <div class="login-card">
+      <h1>员工服务台</h1>
+      <p>用企业微信扫码登录后，可以问 HR 助手、查制度、请假和审批。</p>
+      <p id="login-error" class="error" hidden></p>
+      <a class="button primary" href="/auth/login">企业微信扫码登录</a>
+    </div>
+  </section>
+
+  <div id="app" class="layout" hidden>
+    <header class="topbar">
+      <strong>员工服务台</strong>
+      <span id="who" class="who"></span>
+      <button id="logout" class="link" type="button">退出</button>
+    </header>
+    <nav id="tabs" class="tabs"></nav>
+    <p id="notice" class="notice" hidden></p>
+    <main>
+      <section data-tab="hr" class="panel chat" hidden>
+        <div class="messages" aria-live="polite"></div>
+        <form class="ask">
+          <input name="q" autocomplete="off" maxlength="2000" placeholder="例如：我还有几天年假？帮我请明天一天年假">
+          <button class="button primary">发送</button>
+          <button class="link reset" type="button">新对话</button>
+        </form>
+      </section>
+
+      <section data-tab="policy" class="panel chat" hidden>
+        <div class="messages" aria-live="polite"></div>
+        <form class="ask">
+          <input name="q" autocomplete="off" maxlength="2000" placeholder="例如：年假怎么计算？报销要哪些材料？">
+          <button class="button primary">发送</button>
+          <button class="link reset" type="button">新对话</button>
+        </form>
+      </section>
+
+      <section data-tab="leave" class="panel" hidden>
+        <h2>假期余额</h2>
+        <table id="balances"><thead><tr><th>假期</th><th>总额</th><th>已休</th><th>审批中</th><th>剩余</th></tr></thead><tbody></tbody></table>
+        <div id="apply" hidden>
+          <h2>发起请假</h2>
+          <form id="leave-form" class="grid">
+            <label>假期类型<select name="leave_type" required></select></label>
+            <label>开始日期<input name="from_date" type="date" required></label>
+            <label>结束日期<input name="to_date" type="date" required></label>
+            <label class="wide">事由<input name="reason" maxlength="140"></label>
+            <button class="button primary">生成草稿</button>
+          </form>
+          <div id="draft" class="draft" hidden>
+            <p id="draft-text"></p>
+            <button id="draft-confirm" class="button primary" type="button">确认提交</button>
+            <button id="draft-cancel" class="link" type="button">取消</button>
+          </div>
+        </div>
+        <h2>我的请假</h2>
+        <table id="applications"><thead><tr><th>单号</th><th>假期</th><th>日期</th><th>天数</th><th>状态</th><th>审批人</th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section data-tab="approval" class="panel" hidden>
+        <h2>待我审批</h2>
+        <table id="pending"><thead><tr><th>申请人</th><th>假期</th><th>日期</th><th>天数</th><th>环节</th><th></th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section data-tab="duties" class="panel" hidden>
+        <h2 id="duties-title">岗位职责</h2>
+        <pre id="duties" class="duties"></pre>
+      </section>
+
+      <section data-tab="knowledge" class="panel" hidden>
+        <form id="search" class="ask">
+          <input name="q" autocomplete="off" maxlength="500" placeholder="在你的岗位能看的知识里检索">
+          <button class="button primary">检索</button>
+        </form>
+        <p id="search-notice" class="muted"></p>
+        <div id="results"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
