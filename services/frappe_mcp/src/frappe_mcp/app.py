@@ -4,6 +4,8 @@
 - `POST /v1/leave/confirm`：员工回复“确认请假”后，Chatflow 的 HTTP 节点带 `sys.user_id`
   和请假草稿调用，提交请假单。这个接口不是 MCP 工具，模型调不到
 - `/mcp`：MCP（streamable HTTP），Dify 的 MCP 服务配置带固定 Authorization 头
+- `POST /v1/portal/*`：员工前台（X6）用，带前台自己的 Token 和扫码登录得到的 userid；
+  和 Dify 的 Token 互不通用。不配 `EB_MCP_PORTAL_TOKEN` 时这组接口一律 401
 - `GET /healthz`
 
 所有工具都要求传入会话令牌，只查令牌里那个员工自己的数据。
@@ -33,18 +35,27 @@ from frappe_mcp.tools import CONFIRM_WORD, Tools
 SESSION_HINT = "会话令牌，由工作流在调用前填好，不要自己编写或修改。"
 
 
-class _Auth:
-    """除 /healthz 外都要求服务 Token。"""
+PORTAL = "/v1/portal/"
 
-    def __init__(self, app: ASGIApp, token: bytes) -> None:
+
+class _Auth:
+    """除 /healthz 外都要求服务 Token；前台接口只认前台 Token，其他只认 Dify 的 Token。"""
+
+    def __init__(self, app: ASGIApp, token: bytes, portal_token: bytes | None) -> None:
         self._app = app
         self._token = token
+        self._portal_token = portal_token
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and scope["path"] != "/healthz":
+            expected = self._portal_token if scope["path"].startswith(PORTAL) else self._token
             headers = dict(scope["headers"])
             scheme, _, got = headers.get(b"authorization", b"").decode().partition(" ")
-            if scheme.lower() != "bearer" or not hmac.compare_digest(got.encode(), self._token):
+            if (
+                expected is None
+                or scheme.lower() != "bearer"
+                or not hmac.compare_digest(got.encode(), expected)
+            ):
                 await JSONResponse({"error": "unauthorized"}, status_code=401)(scope, receive, send)
                 return
         await self._app(scope, receive, send)
@@ -101,6 +112,27 @@ def _json_fields(raw: bytes, *names: str) -> list[str] | None:
     return values
 
 
+# 前台能调的工具和各自的参数；userid 只来自请求里前台登录得到的那个，参数里不收身份
+PORTAL_CALLS = {
+    "leave_balance",
+    "my_leave_applications",
+    "pending_my_approval",
+    "my_responsibilities",
+    "leave_types",
+    "draft_leave",
+    "decide",
+}
+PORTAL_ARGS = {
+    "draft_leave": ("leave_type", "from_date", "to_date", "reason"),
+    "confirm_leave": ("draft_token",),
+    "decide": ("leave", "action"),
+}
+
+
+def _text(value: object) -> str:
+    return value.strip()[:4096] if isinstance(value, str) else ""
+
+
 def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIApp:
     s = settings or Settings()
     # MCP SDK 会把日志级别设成 INFO，httpx 的 INFO 日志带完整请求地址
@@ -129,6 +161,26 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
             return JSONResponse({"error": "需要 user_id 和 draft_token"}, status_code=422)
         return JSONResponse(await tools.confirm_leave(*fields))
 
+    async def portal(request: Request) -> Response:
+        name = request.path_params["name"]
+        try:
+            body = json.loads(await request.body())
+            user_id = str(body["user_id"]).strip()
+        except (ValueError, KeyError, TypeError):
+            body, user_id = {}, ""
+        if not isinstance(body, dict) or not 0 < len(user_id) <= 128:
+            return JSONResponse({"error": "需要 user_id"}, status_code=422)
+        if name == "profile":
+            return JSONResponse(await tools.profile(user_id))
+        token = session.issue(secret, user_id, 60)
+        args = {k: _text(body.get(k)) for k in PORTAL_ARGS.get(name, ())}
+        if name == "confirm_leave":
+            return JSONResponse(await tools.confirm_leave(user_id, args["draft_token"]))
+        if name not in PORTAL_CALLS:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        method = getattr(tools, name)
+        return JSONResponse(await method(token, **args))
+
     @contextlib.asynccontextmanager
     async def lifespan(_: Starlette) -> AsyncIterator[None]:
         async with client, mcp.session_manager.run():
@@ -139,8 +191,10 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
             Route("/healthz", healthz),
             Route("/v1/session", new_session, methods=["POST"]),
             Route("/v1/leave/confirm", confirm_leave, methods=["POST"]),
+            Route(PORTAL + "{name}", portal, methods=["POST"]),
             Mount("/mcp", app=mcp.streamable_http_app()),
         ],
         lifespan=lifespan,
     )
-    return _Auth(app, s.mcp_service_token.get_secret_value().encode())
+    portal_token = s.mcp_portal_token.get_secret_value().encode() if s.mcp_portal_token else None
+    return _Auth(app, s.mcp_service_token.get_secret_value().encode(), portal_token)

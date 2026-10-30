@@ -44,6 +44,12 @@ class E2ESettings(BaseSettings):
     # 普通消息是否转给 dify-on-wechat 并进 HR 助手；聊天入口没起时设成 false，只测审批卡片
     wecom_chat: bool = True
 
+    # 员工前台（X6）：不填地址就跳过前台测试。前台的 EB_PORTAL_WECOM_API_BASE 要指向
+    # 测试在 fake_wecom_port 上起的假企业微信接口（http://<跑测试的机器>:<端口>/cgi-bin/），
+    # 用 code 换 userid；不连真实企业微信
+    portal_url: HttpUrl | None = None
+    portal_fake_wecom_port: int = 18091
+
     # 发起请假测试用的假期类型（测试会给合成员工分配这类假期）
     leave_type: str = "年假"
     # 等 Webhook → X5 → Dify 同步完成的最长秒数

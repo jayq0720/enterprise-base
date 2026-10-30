@@ -12,8 +12,6 @@
 import datetime
 import secrets
 import time
-from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -24,7 +22,7 @@ from e2e.settings import E2ESettings
 from e2e.wecom import WeCom
 from e2e.world import World, drop_leave
 
-from .conftest import assert_clean
+from .conftest import Flow, assert_clean
 
 MANAGER, HR, RETURNED = "EB Leave Manager", "EB Leave HR", "EB Leave Returned"
 
@@ -34,66 +32,6 @@ def wecom(settings: E2ESettings) -> WeCom:
     if settings.wecom_callback_url is None:
         pytest.skip("未配置 EB_E2E_WECOM_CALLBACK_URL，跳过企业微信回调测试")
     return WeCom(settings)
-
-
-@dataclass
-class Flow:
-    hr_wecom: str
-    hr_user: str
-
-
-@pytest.fixture(scope="module")
-def flow(settings: E2ESettings, frappe: Frappe, world: World) -> Iterator[Flow]:
-    """两级审批要的人和权限：B 加请假审批人角色，新建 HR 审批人 C，给 A 分配假期。"""
-    tag = world.tag
-    email = f"{tag.lower()}-c@example.invalid"
-    user = str(
-        frappe.insert(
-            "User",
-            {
-                "email": email,
-                "first_name": f"{tag}C",
-                "send_welcome_email": 0,
-                "roles": [{"role": "Employee"}, {"role": "HR User"}],
-            },
-        )["name"]
-    )
-    world.cleanup.append(lambda: frappe.delete("User", user))
-    hr_wecom = f"{tag.lower()}-c"
-    employee = str(
-        frappe.insert(
-            "Employee",
-            {
-                "first_name": f"{tag}C",
-                "gender": "Male",
-                "date_of_birth": "1990-01-01",
-                "date_of_joining": f"{datetime.date.today().year - 1}-01-01",
-                "company": world.company,
-                "department": world.department,
-                "designation": world.b.designation,
-                "status": "Active",
-                "user_id": user,
-                "wecom_userid": hr_wecom,
-                "create_user_permission": 0,
-            },
-        )["name"]
-    )
-    world.cleanup.append(lambda: frappe.delete("Employee", employee))
-    b_roles = frappe.get("User", world.b.user)["roles"]
-    frappe.update(
-        "User",
-        world.b.user,
-        {"roles": [{"role": r["role"]} for r in b_roles] + [{"role": "Leave Approver"}]},
-    )
-    frappe.update("Employee", world.a.employee, {"eb_hr_approver": user})
-
-    def unlink_hr() -> None:
-        # 不先解除，删 C 的用户时会因为还被 A 的档案引用而失败
-        frappe.update("Employee", world.a.employee, {"eb_hr_approver": None})
-
-    world.cleanup.append(unlink_hr)
-    world.allocate_leave(frappe, settings.leave_type)
-    yield Flow(hr_wecom=hr_wecom, hr_user=user)
 
 
 def _leave(settings: E2ESettings, frappe: Frappe, world: World, flow: Flow, days_ahead: int) -> str:

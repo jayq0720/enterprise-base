@@ -36,6 +36,20 @@ TOOL_SWITCHES = {
     "confirm_leave": ("eb_tool_leave_apply", "发起请假"),
     "pending_my_approval": ("eb_tool_approval", "查待我审批"),
     "my_responsibilities": ("eb_tool_duties", "查岗位职责"),
+    "leave_types": ("eb_tool_leave_apply", "发起请假"),
+    "decide": ("eb_tool_approval", "查待我审批"),
+}
+# 员工前台按这几个功能显示页面，键 → 岗位开关
+FEATURES = {
+    "leave_query": "eb_tool_leave_query",
+    "leave_apply": "eb_tool_leave_apply",
+    "approval": "eb_tool_approval",
+    "duties": "eb_tool_duties",
+}
+DECIDE_ERRORS = {
+    "forbidden": "这张单不在你的待审批里，可能已经处理过了。",
+    "rejected": "HR 系统没有接受这次审批，请稍后再试或联系 HR。",
+    "invalid": "审批参数不对，请刷新页面后重试。",
 }
 # 岗位职责是 HR 录的富文本，转成纯文本后最多给模型这么多字
 MAX_DUTIES = 3000
@@ -209,6 +223,54 @@ class Tools:
             "message": f"已提交请假申请 {name}（{draft['leave_type']}，"
             f"{draft['from_date']} 至 {draft['to_date']}），等待审批。",
         }
+
+    async def profile(self, user_id: str) -> dict[str, Any]:
+        """员工前台登录和显示菜单用：在职员工才返回，功能按岗位开关给出。"""
+        try:
+            emp = await self._hr.employee(user_id)
+            if emp is None:
+                return {"ok": False, "error": NO_EMPLOYEE}
+            switches = await self._hr.tool_switches(emp.designation) if emp.designation else None
+        except httpx.HTTPError as e:
+            log.warning("frappe unavailable: %s", type(e).__name__)
+            return {"ok": False, "error": UNAVAILABLE}
+        features = {k: bool(switches and switches.get(f)) for k, f in FEATURES.items()}
+        result: dict[str, Any] = {
+            "ok": True,
+            "employee_name": emp.employee_name,
+            "designation": emp.designation or "",
+            "features": features,
+        }
+        if switches is None:
+            result["notice"] = NO_DESIGNATION
+        return result
+
+    async def leave_types(self, session_token: str) -> dict[str, Any]:
+        async def run(emp: Employee) -> dict[str, Any]:
+            return {"leave_types": await self._hr.leave_types()}
+
+        return await self._as_user(session_token, run, "leave_types")
+
+    async def decide(self, session_token: str, leave: str, action: str) -> dict[str, Any]:
+        """员工前台的通过 / 退回；只能处理停在本人审批环节的单。"""
+        try:
+            uid = session.verify(self._secret, session_token)
+        except session.SessionError as e:
+            return {"ok": False, "error": str(e)}
+        if action not in ("approve", "return") or not 0 < len(leave) <= 140:
+            return {"ok": False, "error": DECIDE_ERRORS["invalid"]}
+
+        async def run(emp: Employee) -> dict[str, Any]:
+            result = await self._hr.decide(uid, leave, action)
+            if result.get("ok") is True:
+                done = "已通过" if action == "approve" else "已退回"
+                return {"ok": True, "message": f"{leave} {done}。"}
+            reason = str(result.get("reason") or "rejected")
+            return {"ok": False, "error": DECIDE_ERRORS.get(reason, DECIDE_ERRORS["rejected"])}
+
+        result = await self._as_user(session_token, run, "decide")
+        result.setdefault("ok", False)
+        return result
 
     async def _as_user(
         self, token: str, run: Callable[[Employee], Any], tool: str

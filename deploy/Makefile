@@ -6,7 +6,7 @@ RUN = $(PYTHON) prepare.py
 EDGE = $(DOCKER) compose --env-file $(ENV) -f docker-compose.yml
 DIFY = $(DOCKER) compose --env-file secrets/dify.env -f data/dify/docker/eb-compose.yaml
 HR = $(DOCKER) compose --env-file $(ENV) -f data/frappe/eb-compose.yaml
-.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant wecom-cards
+.PHONY: init prepare config verify build up wechat status down policy-sync hr-assistant wecom-cards portal
 init:
 	$(RUN) init
 prepare:
@@ -14,7 +14,7 @@ prepare:
 config: prepare
 	$(EDGE) --profile wechat config --quiet
 	$(DIFY) config --quiet
-	$(HR) --profile bootstrap --profile policy-sync --profile hr-assistant config --quiet
+	$(HR) --profile bootstrap --profile policy-sync --profile hr-assistant --profile portal config --quiet
 verify:
 	$(PYTHON) validate.py
 	$(PYTHON) -m unittest discover -s tests -p 'test_backup_bundle.py'
@@ -74,6 +74,11 @@ hr-assistant: prepare
 	$(RUN) hr-assistant $(ENV)
 	$(DIFY) up -d --force-recreate ssrf_proxy
 	$(HR) --profile hr-assistant up -d --wait --wait-timeout 300 kb-gateway frappe-mcp
+
+portal: prepare
+	$(RUN) portal $(ENV)
+	$(HR) --profile hr-assistant up -d --force-recreate --wait --wait-timeout 300 frappe-mcp
+	$(HR) --profile portal up -d --wait --wait-timeout 300 portal
 
 .PHONY: health
 health:

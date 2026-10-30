@@ -19,6 +19,7 @@ X4_METHODS = {
     "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
     "hrms.hr.doctype.leave_application.leave_application.get_leave_approver",
 }
+X4_POST_METHOD = "enterprise_base.wecom.portal_actions.decide"
 
 
 class Employee(EmployeeMaster):
@@ -147,7 +148,11 @@ def x4_api():
     path = unquote(frappe.request.path).rstrip("/")
     method, form = frappe.request.method, frappe.form_dict
     parts = path.split("/")
-    allowed = method == "GET" and path.removeprefix("/api/method/") in X4_METHODS
+    called = path.removeprefix("/api/method/")
+    # 员工前台的审批操作：方法内再按审批人本人校验，见 wecom/portal_actions.py
+    allowed = (method == "GET" and called in X4_METHODS) or (
+        method == "POST" and called == X4_POST_METHOD
+    )
     if parts[:3] == ["", "api", "resource"] and len(parts) in (4, 5):
         dt = parts[3]
         allowed = method == "POST" and dt == "Leave Application" and len(parts) == 4

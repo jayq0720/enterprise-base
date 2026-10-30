@@ -61,6 +61,16 @@ make wechat
 
 上游企业微信渠道会打印凭据和消息，因此部署将 stdout/stderr 与 `/app/run.log` 丢弃，Docker 日志驱动设为 `none`；不要临时开启原始日志。附带聊天插件全部禁用，避免切换模型或读取额外数据。故障只反馈容器状态和 HTTP 状态码。启动入口不等于收发已通过：需以测试员工发消息，检查 Chatflow 的 `sys.user_id` 与该员工企业微信 userid 一致，记录“相等/不相等”，不要粘贴真实 userid、Key 或完整运行记录。
 
+## 员工前台（X6）
+员工在电脑浏览器用的网页，地址 `portal.<EB_DOMAIN>`，企业微信扫码登录，内容是 HR 助手、制度问答、请假、审批、职责和资料检索。服务说明见 [services/portal/README.md](../services/portal/README.md)。前提：`make hr-assistant` 已起 X3/X4。
+
+1. `make init` 补齐两项前台密钥（`EB_PORTAL_SESSION_SECRET`、`EB_MCP_PORTAL_TOKEN`），不覆盖已有值。
+2. 在 `secrets/.env` 填 `EB_PORTAL_WECOM_CORP_ID`、`EB_PORTAL_WECOM_AGENT_ID`、`EB_PORTAL_WECOM_APP_SECRET`（可以和扫码登录用同一个企业微信应用）。要在前台对话时，再填 Dify 后台“HR 助手”“制度问答”两个应用的 API Key（`EB_PORTAL_DIFY_HR_APP_KEY`、`EB_PORTAL_DIFY_POLICY_APP_KEY`），留空的应用前台不显示。
+3. `EB_PORTAL_IMAGE` 要是 main CI 发布的固定摘要（全零占位会被拒绝）。
+4. `make portal`：校验配置，带上前台 Token 重建 X4，再起前台。
+
+企业微信后台：应用的“网页授权及 JS-SDK”可信域名和“企业微信授权登录”回调域都加 `portal.<客户域名>`，需要备案域名和公网 HTTPS。前台站点不加管理员白名单，员工从公网访问；只代理到前台服务，请求体上限 64 KB。前台是独立服务，浏览器拿不到任何服务 Token 或 Dify Key。`make release` 和 `make health` 会带上正在运行的前台；`make restore` 不自动起前台，恢复后再执行 `make portal`。
+
 ## 校验、重启与证据
 ```sh
 make config                 # 校验入口、完整 Dify、完整 Frappe 三套配置，不输出展开后的密钥

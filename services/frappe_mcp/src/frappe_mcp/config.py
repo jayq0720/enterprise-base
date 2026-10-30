@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     mcp_service_token: SecretStr = Field(min_length=32)
     # 会话令牌的签名密钥，和服务 Token 分开
     mcp_session_secret: SecretStr = Field(min_length=32)
+    # 员工前台（X6）调 /v1/portal/* 的 Token，和 Dify 用的分开；不填就不开前台接口
+    mcp_portal_token: SecretStr | None = Field(default=None, min_length=32)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     # 请假草稿多久内可以确认
     draft_ttl_seconds: int = Field(default=600, ge=60, le=3600)

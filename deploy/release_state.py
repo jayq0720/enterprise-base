@@ -18,10 +18,13 @@ IMAGE_KEYS = {
     "EB_POLICY_SYNC_IMAGE": "policy-sync",
     "EB_KB_GATEWAY_IMAGE": "kb-gateway",
     "EB_FRAPPE_MCP_IMAGE": "frappe-mcp",
+    "EB_PORTAL_IMAGE": "portal",
 }
+# 员工前台是后加的可选服务，旧版本的 .env.example 没有这一项
+OPTIONAL_IMAGES = {"EB_PORTAL_IMAGE"}
 PIN = (
     r"ghcr\.io/[a-z0-9_.-]+/enterprise-base-"
-    r"(?:policy-sync|kb-gateway|frappe-mcp)@sha256:[a-f0-9]{64}"
+    r"(?:policy-sync|kb-gateway|frappe-mcp|portal)@sha256:[a-f0-9]{64}"
 )
 SHA = r"[a-f0-9]{40}"
 PHASES = {
@@ -38,10 +41,12 @@ PHASES = {
 
 def images(config):
     result = {k: v for k, v in config.items() if k.endswith("_IMAGE") and v}
-    if set(result) != set(IMAGE_KEYS) or any(not re.fullmatch(PIN, v) for v in result.values()):
-        raise ValueError("服务镜像须为三项已知服务的固定摘要")
-    for key, suffix in IMAGE_KEYS.items():
-        if not result[key].split("@", 1)[0].endswith("-" + suffix):
+    if not set(IMAGE_KEYS) - OPTIONAL_IMAGES <= set(result) <= set(IMAGE_KEYS) or any(
+        not re.fullmatch(PIN, v) for v in result.values()
+    ):
+        raise ValueError("服务镜像须为已知服务的固定摘要")
+    for key, image in result.items():
+        if not image.split("@", 1)[0].endswith("-" + IMAGE_KEYS[key]):
             raise ValueError("服务镜像对应关系无效")
     return result
 
@@ -86,7 +91,9 @@ def plan(repository, revision, env, run=command, main_ref="refs/remotes/origin/m
     project = config["EB_PROJECT"]
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,62}", project):
         raise ValueError("发布项目名无效")
-    if images(config) != images(old_pins):
+    configured, locked = images(config), images(old_pins)
+    # 回退到没有前台的版本后，配置里可能还留着前台镜像；只比当前版本锁定的几项
+    if {k: configured.get(k) for k in locked} != locked:
         raise ValueError("当前镜像与当前 main 锁定配置不符")
     return dict(
         project=project,

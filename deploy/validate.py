@@ -65,6 +65,10 @@ def audit(model, stack):
                     and not service.get("network_mode") and not service.get("privileged"), "X3/X4 镜像或网络隔离错误。")
             require(service["healthcheck"]["test"] == ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"],
                     "X3/X4 健康检查必须 GET /healthz。")
+        portal = model["services"]["portal"]
+        require(bool(re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:[a-f0-9]{64}", portal["image"]))
+                and set(portal["networks"]) == {"default", "edge"} and not portal.get("ports")
+                and not portal.get("network_mode") and not portal.get("privileged"), "员工前台镜像或网络隔离错误。")
     for service in model["services"].values():
         image = service["image"]
         # PostgreSQL 10+ 使用主版本.补丁版本，其它当前组件使用三段版本。
@@ -173,8 +177,9 @@ def validate(work):
     require(private.read_bytes() == before, "重复初始化覆盖了密钥。")
     values = settings(private)
     original = dict(values)
-    upgraded = {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", "EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET"}
-    added = {k for k in values if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_"))}
+    upgraded = {"EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN", "EB_KB_SERVICE_TOKEN", "EB_MCP_SERVICE_TOKEN", "EB_MCP_SESSION_SECRET",
+                "EB_MCP_PORTAL_TOKEN", "EB_PORTAL_SESSION_SECRET"}
+    added = {k for k in values if k.startswith(("EB_KB_", "EB_MCP_", "EB_FRAPPE_MCP_", "EB_PORTAL_"))}
     private.write_text("".join(f"{k}={v}\n" for k, v in values.items()
                                if k not in upgraded | added))
     prepare("init")
@@ -216,6 +221,15 @@ def validate(work):
             "EB_KB_SERVICE_TOKEN": "short", "EB_MCP_FRAPPE_API_KEY": assistant["EB_KB_FRAPPE_API_KEY"]}.items():
         incomplete.write_text("".join(f"{k}={replacement if k == defect else v}\n" for k, v in assistant.items()))
         prepare("hr-assistant", str(incomplete), success=False)
+    front = {**assistant, **{k: "synthetic-" + k for k in ("EB_PORTAL_WECOM_CORP_ID", "EB_PORTAL_WECOM_AGENT_ID", "EB_PORTAL_WECOM_APP_SECRET")}}
+    prepare("portal", "secrets/.env", success=False)
+    for defect, replacement in (("EB_PORTAL_WECOM_APP_SECRET", ""), ("EB_MCP_PORTAL_TOKEN", values["EB_MCP_SERVICE_TOKEN"]),
+            ("EB_PORTAL_SESSION_SECRET", "short"), ("EB_PORTAL_IMAGE", "image:latest"),
+            ("EB_PORTAL_IMAGE", settings(work / ".env.example")["EB_PORTAL_IMAGE"])):
+        incomplete.write_text("".join(f"{k}={replacement if k == defect else v}\n" for k, v in front.items()))
+        prepare("portal", str(incomplete), success=False)
+    incomplete.write_text("".join(f"{k}={v}\n" for k, v in {**front, "EB_PORTAL_IMAGE": "ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:" + "a" * 64}.items()))
+    prepare("portal", str(incomplete))
     values.update({key: assistant[key] for key in credentials})
     policy = dict(values)
     api_keys = ("EB_SYNC_FRAPPE_API_KEY", "EB_SYNC_FRAPPE_API_SECRET", "EB_SYNC_DIFY_DATASET_API_KEY")
@@ -276,7 +290,7 @@ def validate(work):
             if profile:
                 command += ["--profile", profile]
             if stack == "frappe":
-                command += ["--profile", "policy-sync", "--profile", "hr-assistant"]
+                command += ["--profile", "policy-sync", "--profile", "hr-assistant", "--profile", "portal"]
             run([*command, "config", "--quiet"], work)
             rendered = run([*command, "config", "--format", "json"], work)
             model = json.loads(rendered)
@@ -355,6 +369,14 @@ def validate(work):
                         except RuntimeError:
                             continue
                         raise RuntimeError("X3/X4 隔离反例未被拒绝。")
+                front = services["portal"]["environment"]
+                require(front["EB_PORTAL_PUBLIC_URL"] == f"{scheme}://portal.{domain}"
+                        and front["EB_PORTAL_X4_PORTAL_TOKEN"] == values["EB_MCP_PORTAL_TOKEN"]
+                        == services["frappe-mcp"]["environment"]["EB_MCP_PORTAL_TOKEN"]
+                        and front["EB_PORTAL_X3_TOKEN"] == values["EB_KB_SERVICE_TOKEN"]
+                        and front["EB_PORTAL_SESSION_SECRET"] == values["EB_PORTAL_SESSION_SECRET"]
+                        and set(front) == set(settings(ROOT.parent / "services/portal/.env.example")),
+                        "员工前台地址、Token 映射错误或收到了额外配置。")
                 require(services["kb-gateway"]["environment"]["EB_DIFY_API_BASE"] == "http://dify/v1"
                         and services["kb-gateway"]["environment"]["EB_DIFY_DATASET_API_KEY"] == values["EB_KB_DIFY_DATASET_API_KEY"]
                         and services["frappe-mcp"]["environment"]["EB_MCP_SESSION_SECRET"] == values["EB_MCP_SESSION_SECRET"]
@@ -370,7 +392,7 @@ def validate(work):
 
 def main():
     require(shutil.which(COMPOSE[0]) is not None, "找不到 Compose 校验程序。")
-    for name in ("kb-gateway", "frappe-mcp"):
+    for name in ("kb-gateway", "frappe-mcp", "portal"):
         run(["git", "check-ignore", "-q", f"secrets/{name}.env"], ROOT)
     with tempfile.TemporaryDirectory(prefix="eb-validation-") as temp:
         work = Path(temp) / "deploy"
@@ -380,7 +402,7 @@ def main():
         config = Path(temp) / "config/dify-on-wechat"
         config.mkdir(parents=True)
         shutil.copyfile(ROOT.parent / "config/dify-on-wechat/config.json", config / "config.json")
-        for name in ("policy_sync", "kb_gateway", "frappe_mcp"):
+        for name in ("policy_sync", "kb_gateway", "frappe_mcp", "portal"):
             folder = Path(temp) / "services" / name
             folder.mkdir(parents=True)
             shutil.copyfile(ROOT.parent / f"services/{name}/.env.example", folder / ".env.example")

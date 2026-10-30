@@ -17,6 +17,8 @@ from frappe_mcp.config import Settings
 LEAVE_APP = "hrms.hr.doctype.leave_application.leave_application"
 LEAVE_DETAILS = f"{LEAVE_APP}.get_leave_details"
 LEAVE_APPROVER = f"{LEAVE_APP}.get_leave_approver"
+# X2 给员工前台的审批方法：以审批人本人身份走原生 Workflow，只有 X4 接口账号能调
+PORTAL_DECIDE = "enterprise_base.wecom.portal_actions.decide"
 LEAVE_FIELDS = [
     "name",
     "employee_name",
@@ -73,6 +75,8 @@ class HR(Protocol):
     async def responsibilities(self, designation: str) -> str | None: ...
 
     async def tool_switches(self, designation: str) -> dict[str, bool | None] | None: ...
+
+    async def decide(self, wecom_userid: str, leave: str, action: str) -> dict[str, Any]: ...
 
 
 class FrappeHR:
@@ -167,6 +171,17 @@ class FrappeHR:
             return None
         row = rows[0]
         return {f: None if row.get(f) is None else bool(row[f]) for f in TOOL_SWITCH_FIELDS}
+
+    async def decide(self, wecom_userid: str, leave: str, action: str) -> dict[str, Any]:
+        """以审批人本人身份通过或退回；Frappe 按卡片审批同样的规则重新校验审批人。"""
+        resp = await self._client.post(
+            f"{self._base}/api/method/{PORTAL_DECIDE}",
+            headers=self._headers,
+            json={"userid": wecom_userid, "leave": leave, "action": action},
+        )
+        resp.raise_for_status()
+        result: dict[str, Any] = resp.json().get("message") or {}
+        return result
 
     async def _list(
         self,

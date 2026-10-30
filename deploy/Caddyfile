@@ -20,3 +20,10 @@
     }
     respond 404
 }
+# 员工前台（X6）对员工开放，不加管理员白名单；身份由前台扫码登录校验。
+{$PORTAL_ADDRESS} {
+    request_body {
+        max_size 65536
+    }
+    reverse_proxy portal:8080
+}
