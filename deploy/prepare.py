@@ -98,7 +98,7 @@ if mode in MODES:
         keys = [*ASSISTANT_SECRETS, "EB_KB_FRAPPE_API_KEY", "EB_KB_FRAPPE_API_SECRET", "EB_KB_DIFY_DATASET_API_KEY", "EB_MCP_FRAPPE_API_KEY", "EB_MCP_FRAPPE_API_SECRET"]
     if any(not settings.get(k) or settings[k] == "CHANGE_ME" for k in keys):
         sys.exit("必填凭据未配置；请只在服务器编辑 secrets/.env。")
-    if mode == "policy-sync" and not re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-policy-sync@sha256:[a-f0-9]{64}", settings.get("EB_POLICY_SYNC_IMAGE", "")):
+    if mode == "policy-sync" and not re.fullmatch(r"ghcr.io/jayq0720/enterprise-base-policy-sync@sha256:[a-f0-9]{64}", settings.get("EB_POLICY_SYNC_IMAGE", "")):
         sys.exit("policy-sync 必须使用本仓库 CI 发布的 SHA256 镜像摘要。")
     if mode == "policy-sync" and any(len(settings[k]) < 32 for k in ("EB_SYNC_WEBHOOK_SECRET", "EB_SYNC_SERVICE_TOKEN")):
         sys.exit("两项 X5 密钥都必须至少 32 位。")
@@ -106,7 +106,7 @@ if mode in MODES:
         sys.exit("X5 索引方式仅允许 high_quality 或 economy。")
     if mode == "hr-assistant":
         for key, service in (("EB_KB_GATEWAY_IMAGE", "kb-gateway"), ("EB_FRAPPE_MCP_IMAGE", "frappe-mcp")):
-            if not re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-" + service + r"@sha256:[a-f0-9]{64}", settings.get(key, "")):
+            if not re.fullmatch(r"ghcr.io/jayq0720/enterprise-base-" + service + r"@sha256:[a-f0-9]{64}", settings.get(key, "")):
                 sys.exit("X3/X4 必须使用本仓库 main CI 发布的 SHA256 镜像摘要。")
         if len({settings[k] for k in ASSISTANT_SECRETS}) != 3 or any(len(settings[k]) < 32 for k in ASSISTANT_SECRETS):
             sys.exit("X3/X4 三项密钥须独立且各至少 32 位。")
@@ -115,7 +115,7 @@ if mode in MODES:
         if settings.get("EB_KB_DIFY_SEARCH_METHOD", "hybrid_search") not in {"hybrid_search", "semantic_search", "keyword_search"}:
             sys.exit("X3 检索方式无效。")
     if mode == "portal":
-        if (not re.fullmatch(r"ghcr.io/qianjie0720-sys/enterprise-base-portal@sha256:[a-f0-9]{64}", settings.get("EB_PORTAL_IMAGE", ""))
+        if (not re.fullmatch(r"ghcr.io/jayq0720/enterprise-base-portal@sha256:[a-f0-9]{64}", settings.get("EB_PORTAL_IMAGE", ""))
                 or set(settings["EB_PORTAL_IMAGE"].rsplit(":", 1)[1]) == {"0"}):
             sys.exit("员工前台必须使用本仓库 main CI 发布的 SHA256 镜像摘要。")
         tokens = [settings[k] for k in (*ASSISTANT_SECRETS, *PORTAL_SECRETS)]
