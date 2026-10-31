@@ -1,0 +1,24 @@
+# 询盘助手标准问题集（用开了“处理询盘”“查询盘统计”的业务员 EB_EVAL_SALES 提问）。
+# 只读：记跟进、看详情都用不存在的询盘号，系统会回“不在你名下”，不会写数据。
+app: inquiry-assistant
+user: sales
+routes:
+  list: t_list
+  detail: x_detail
+  draft: x_draft
+  follow: x_follow
+  stats: x_stats
+  other: a_other
+cases:
+  - {id: list-1, q: 我有哪些待跟进的询盘？, route: list, any: [待跟进的询盘, 没有待跟进, 没有开通]}
+  - {id: list-2, q: 看看新询盘, route: list, any: [待跟进的询盘, 没有待跟进, 没有开通]}
+  - {id: detail-1, q: 看一下 CRM-LEAD-1999-99999 的详情, route: detail, any: [不在你名下, 没法识别, 没有开通]}
+  - {id: draft-1, q: 帮我给 CRM-LEAD-1999-99999 写个回复草稿, route: draft, any: [不在你名下, 没法, 没有开通]}
+  - id: follow-1
+    q: CRM-LEAD-1999-99999 已回复
+    route: follow
+    any: [不在你名下, 没法, 没有开通]
+    none: [已更新询盘]
+  - {id: stats-1, q: 最近 30 天各渠道来了多少询盘？, route: stats, any: [新进询盘, 没法统计, 没有开通]}
+  - {id: stats-2, q: AI 引擎带来的询盘统计, route: stats, any: [新进询盘, 没法统计, 没有开通]}
+  - {id: other-1, q: 帮我订一张去上海的机票, route: other, all: [我可以帮你]}
