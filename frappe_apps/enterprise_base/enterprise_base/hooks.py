@@ -140,3 +140,6 @@ _custom_field_names.extend(
         *(f"Lead-{field['fieldname']}" for field in _lead_fields()),
     ]
 )
+
+# X4 工具调用审计：按保留天数每天清理
+scheduler_events["daily"] = ["enterprise_base.duties.audit.purge"]

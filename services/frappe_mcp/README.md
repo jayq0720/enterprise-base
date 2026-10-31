@@ -93,6 +93,14 @@ HR 在 Frappe 的“岗位”上勾选这个岗位的员工能用哪些助手功
 | `EB_PORTAL_RATE_PER_MINUTE` | 60 | 前台接口返回 429，前台显示“操作太频繁” |
 | `EB_INTAKE_PER_MINUTE`、`EB_INTAKE_PER_DAY` | 30、500 | 进件返回 429，网站后台稍后重推；被拒的不建询盘 |
 
+## 审计
+
+每次工具调用（Dify、员工前台）、确认请假和询盘进件都记一条：入口（`dify` / `portal` / `intake`）、工具、结果（`ok` 成功、`rejected` 业务上没通过、`denied` 身份或岗位开关拒绝、`error` HR 系统不可用）、原因代码、企业微信 userid、员工编号、操作对象（请假单号、询盘号）。只记这些标识，不记请假事由、跟进内容、客户联系方式和令牌。
+
+- 写到本服务日志（logger `frappe_mcp.audit`，一行 JSON，`docker logs frappe-mcp` 可查）；
+- 同时调 Frappe 的 `enterprise_base.duties.audit.record` 存进 **EB Audit Log**（HR 经理、系统管理员在后台只读查看，不能改删；只有 X4 接口账号能写）。写 Frappe 失败只记一条警告，不影响员工操作。
+- 保留天数用 Frappe 站点配置 `eb_audit_retention_days`（默认 180，最少 30），每天清理一次。
+
 ## 在 Dify 里接入
 
 1. 工具 → MCP → 添加 MCP 服务：地址 `http://frappe-mcp:8080/mcp/`，请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`。

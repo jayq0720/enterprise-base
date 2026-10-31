@@ -43,6 +43,8 @@ class FakeHR:
         on = dict.fromkeys(TOOL_SWITCH_FIELDS, True)
         self.switches: dict[str, dict[str, bool | None]] = {"出纳": {**on}, "主管": {**on}}
         self.inquiry_calls: list[tuple[str, dict[str, Any]]] = []
+        self.audits: list[dict[str, str]] = []
+        self.audit_down = False
 
     async def employee(self, wecom_userid: str) -> Employee | None:
         if self.down:
@@ -104,6 +106,13 @@ class FakeHR:
         if wecom_userid == "lisi" and leave == "HR-LAP-1":
             return {"ok": True, "stage": "EB Leave HR"}
         return {"ok": False, "reason": "forbidden"}
+
+    async def audit(self, entry: dict[str, str]) -> None:
+        if self.audit_down:
+            import httpx
+
+            raise httpx.ConnectError("down")
+        self.audits.append(entry)
 
     async def inquiry_call(self, method: str, body: dict[str, Any]) -> dict[str, Any]:
         """模拟 Frappe 询盘方法：CRM-LEAD-1 属于张三，其他人一律 forbidden。"""
