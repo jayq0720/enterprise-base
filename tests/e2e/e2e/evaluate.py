@@ -84,6 +84,10 @@ def chat(http: httpx.Client, user: str, query: str) -> tuple[str, list[str], dic
                 nodes.append(str(event["data"]["node_id"]))
             elif kind in ("message", "agent_message"):
                 answer.append(str(event.get("answer") or ""))
+            elif (
+                kind == "workflow_finished" and (event.get("data") or {}).get("status") == "failed"
+            ):
+                raise RuntimeError("工作流出错：" + str(event["data"].get("error"))[:200])
             elif kind == "workflow_finished" and not answer:
                 # 没收到流式片段时（例如回复节点前有失败的节点）用工作流最终输出
                 answer.append(
