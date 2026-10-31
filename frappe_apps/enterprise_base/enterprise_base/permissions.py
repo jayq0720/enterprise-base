@@ -20,9 +20,10 @@ X4_METHODS = {
     "hrms.hr.doctype.leave_application.leave_application.get_leave_details",
     "hrms.hr.doctype.leave_application.leave_application.get_leave_approver",
 }
-# 写方法：员工前台审批，以及询盘方法（方法内再校验负责人本人，见 marketing/api.py）
+# 写方法：员工前台审批、工具调用审计，以及询盘方法（方法内再校验负责人本人，见 marketing/api.py）
 X4_POST_METHODS = {
     "enterprise_base.wecom.portal_actions.decide",
+    "enterprise_base.duties.audit.record",
     *(
         f"enterprise_base.marketing.api.{name}"
         for name in ("intake", "my_inquiries", "inquiry", "follow_up", "stats")

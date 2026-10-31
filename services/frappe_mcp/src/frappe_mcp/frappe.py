@@ -22,6 +22,8 @@ PORTAL_DECIDE = "enterprise_base.wecom.portal_actions.decide"
 # 询盘中心的方法（X1/X2 App 的 marketing/api.py）：只有 X4 接口账号能调，方法内校验负责人
 INQUIRY_API = "enterprise_base.marketing.api."
 INQUIRY_METHODS = ("intake", "my_inquiries", "inquiry", "follow_up", "stats")
+# X4 工具调用审计（duties/audit.py），只有 X4 接口账号能写
+AUDIT_METHOD = "enterprise_base.duties.audit.record"
 LEAVE_FIELDS = [
     "name",
     "employee_name",
@@ -86,6 +88,8 @@ class HR(Protocol):
     async def decide(self, wecom_userid: str, leave: str, action: str) -> dict[str, Any]: ...
 
     async def inquiry_call(self, method: str, body: dict[str, Any]) -> dict[str, Any]: ...
+
+    async def audit(self, entry: dict[str, str]) -> None: ...
 
 
 class FrappeHR:
@@ -203,6 +207,14 @@ class FrappeHR:
         resp.raise_for_status()
         result: dict[str, Any] = resp.json().get("message") or {}
         return result
+
+    async def audit(self, entry: dict[str, str]) -> None:
+        resp = await self._client.post(
+            f"{self._base}/api/method/{AUDIT_METHOD}", headers=self._headers, json=entry
+        )
+        resp.raise_for_status()
+        if (resp.json().get("message") or {}).get("ok") is not True:
+            raise ValueError("audit rejected")
 
     async def _list(
         self,

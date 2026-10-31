@@ -1,0 +1,29 @@
+{
+  "doctype": "DocType",
+  "name": "EB Audit Log",
+  "module": "Duties",
+  "custom": 0,
+  "istable": 0,
+  "engine": "InnoDB",
+  "autoname": "hash",
+  "in_create": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "title_field": "tool",
+  "field_order": ["channel", "tool", "outcome", "reason", "userid", "employee", "target"],
+  "fields": [
+    {"fieldname": "channel", "label": "入口", "fieldtype": "Select", "options": "dify\nportal\nintake", "reqd": 1, "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "tool", "label": "工具", "fieldtype": "Data", "reqd": 1, "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "outcome", "label": "结果", "fieldtype": "Select", "options": "ok\nrejected\ndenied\nerror", "reqd": 1, "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "reason", "label": "原因", "fieldtype": "Data", "read_only": 1},
+    {"fieldname": "userid", "label": "企业微信 userid", "fieldtype": "Data", "read_only": 1, "in_standard_filter": 1},
+    {"fieldname": "employee", "label": "员工", "fieldtype": "Link", "options": "Employee", "read_only": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "target", "label": "操作对象", "fieldtype": "Data", "read_only": 1, "in_standard_filter": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1, "report": 1, "export": 1},
+    {"role": "HR Manager", "read": 1, "report": 1, "export": 1}
+  ],
+  "track_changes": 0,
+  "allow_rename": 0
+}
