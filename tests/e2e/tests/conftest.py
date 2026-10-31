@@ -1,4 +1,4 @@
-"""没配置测试环境（EB_E2E_FRAPPE_URL 为空）时整套跳过（test_dsl.py 除外），CI 里只做静态检查。"""
+"""没配置测试环境（EB_E2E_FRAPPE_URL 为空）时整套跳过（离线检查 OFFLINE 除外）。"""
 
 import datetime
 import os
@@ -13,13 +13,15 @@ from e2e.clients import X3, X4, DifyDatasets, Frappe, HRAssistant
 from e2e.settings import E2ESettings
 from e2e.world import World, build, teardown
 
+OFFLINE = {"test_dsl.py", "test_golden.py"}
+
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     if not os.environ.get("EB_E2E_FRAPPE_URL"):
         skip = pytest.mark.skip(reason="未配置测试环境（EB_E2E_*），跳过端到端测试")
         for item in items:
             # 离线检查（DSL 结构）不需要测试环境
-            if item.path.name != "test_dsl.py":
+            if item.path.name not in OFFLINE:
                 item.add_marker(skip)
 
 

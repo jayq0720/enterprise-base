@@ -80,6 +80,11 @@ portal: prepare
 	$(HR) --profile hr-assistant up -d --force-recreate --wait --wait-timeout 300 frappe-mcp
 	$(HR) --profile portal up -d --wait --wait-timeout 300 portal
 
+# 标准问题集评测：配置写在 tests/e2e/.env（EB_EVAL_*），见 tests/e2e/README.md“标准问题集”
+.PHONY: eval
+eval:
+	cd ../tests/e2e && $(UV) run python -m e2e.evaluate $(FILES)
+
 .PHONY: health
 health:
 	@$(PYTHON) health.py "$(ENV)"
