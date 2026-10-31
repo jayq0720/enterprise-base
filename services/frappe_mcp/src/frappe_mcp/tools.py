@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from frappe_mcp import session
+from frappe_mcp import audit, session
 from frappe_mcp.config import Settings
 from frappe_mcp.frappe import HR, Employee, FrappeRejected
 
@@ -219,19 +219,45 @@ class Tools:
 
     async def confirm_leave(self, user_id: str, draft_token: str) -> dict[str, Any]:
         """员工本人回复确认后，由工作流（不是模型）调用，把草稿原样提交到 HR 系统。"""
+        result, outcome, why, employee = await self._confirm_leave(user_id, draft_token)
+        await audit.record(
+            self._hr,
+            "confirm_leave",
+            outcome,
+            userid=user_id,
+            employee=employee,
+            target=str(result.get("id") or ""),
+            reason=why,
+        )
+        return result
+
+    async def _confirm_leave(
+        self, user_id: str, draft_token: str
+    ) -> tuple[dict[str, Any], str, str, str]:
+        """返回（结果, 审计结果, 原因, 员工编号），后三项只给审计用。"""
         try:
             draft = session.unsign(self._secret, session.LEAVE_DRAFT, draft_token)
         except session.SessionError:
-            return {"ok": False, "error": "请假草稿无效或已过期，请重新发起。"}
+            return (
+                {"ok": False, "error": "请假草稿无效或已过期，请重新发起。"},
+                "denied",
+                "draft",
+                "",
+            )
         if draft["uid"] != user_id:
-            return {"ok": False, "error": "请假草稿无效或已过期，请重新发起。"}
+            return (
+                {"ok": False, "error": "请假草稿无效或已过期，请重新发起。"},
+                "denied",
+                "draft",
+                "",
+            )
         try:
             emp = await self._hr.employee(user_id)
             if emp is None or emp.name != draft.get("emp"):
-                return {"ok": False, "error": NO_EMPLOYEE}
+                return {"ok": False, "error": NO_EMPLOYEE}, "denied", "no_employee", ""
             # 起草后岗位被关掉“发起请假”的，确认时也不再提交
             if off := await self._switched_off(emp, "confirm_leave"):
-                return {"ok": False, "error": off}
+                return {"ok": False, "error": off}, "denied", "switched_off", emp.name
             name = await self._hr.create_leave(
                 {
                     "employee": emp.name,
@@ -245,16 +271,21 @@ class Tools:
         except FrappeRejected as e:
             log.info("leave rejected: %s", e.exc_type)
             msg = REJECTED.get(e.exc_type) or f"HR 系统没有接受这张请假单：{e.message}"
-            return {"ok": False, "error": msg}
+            return {"ok": False, "error": msg}, "rejected", e.exc_type, emp.name if emp else ""
         except httpx.HTTPError as e:
             log.warning("frappe unavailable: %s", type(e).__name__)
-            return {"ok": False, "error": UNAVAILABLE}
-        return {
-            "ok": True,
-            "id": name,
-            "message": f"已提交请假申请 {name}（{draft['leave_type']}，"
-            f"{draft['from_date']} 至 {draft['to_date']}），等待审批。",
-        }
+            return {"ok": False, "error": UNAVAILABLE}, "error", "frappe_unavailable", ""
+        return (
+            {
+                "ok": True,
+                "id": name,
+                "message": f"已提交请假申请 {name}（{draft['leave_type']}，"
+                f"{draft['from_date']} 至 {draft['to_date']}），等待审批。",
+            },
+            "ok",
+            "",
+            emp.name,
+        )
 
     async def profile(self, user_id: str) -> dict[str, Any]:
         """员工前台登录和显示菜单用：在职员工才返回，功能按岗位开关给出。"""
@@ -300,7 +331,7 @@ class Tools:
             reason = str(result.get("reason") or "rejected")
             return {"ok": False, "error": DECIDE_ERRORS.get(reason, DECIDE_ERRORS["rejected"])}
 
-        result = await self._as_user(session_token, run, "decide")
+        result = await self._as_user(session_token, run, "decide", leave)
         result.setdefault("ok", False)
         return result
 
@@ -355,7 +386,9 @@ class Tools:
                 result = {"ok": True, "inquiry": detail, "notes": result.get("notes", [])}
             return result
 
-        return await self._as_user(session_token, run, "inquiry_detail")
+        return await self._as_user(
+            session_token, run, "inquiry_detail", inquiry_id.strip()[:MAX_INQUIRY_ID]
+        )
 
     async def follow_up_inquiry(
         self, session_token: str, inquiry_id: str, status: str = "", note: str = ""
@@ -380,7 +413,9 @@ class Tools:
                 }
             return result
 
-        return await self._as_user(session_token, run, "follow_up_inquiry")
+        return await self._as_user(
+            session_token, run, "follow_up_inquiry", inquiry_id.strip()[:MAX_INQUIRY_ID]
+        )
 
     async def inquiry_stats(self, session_token: str, days: int = 30) -> dict[str, Any]:
         async def run(emp: Employee) -> dict[str, Any]:
@@ -399,10 +434,19 @@ class Tools:
             result = await self._hr.inquiry_call("intake", {"data": payload})
         except httpx.HTTPError as e:
             log.warning("frappe unavailable: %s", type(e).__name__)
+            await audit.record(self._hr, "intake", "error", reason="frappe_unavailable")
             return {"ok": False, "error": "询盘系统暂时不可用，请稍后重试。"}
         if not result.get("ok"):
             reason = str(result.get("reason") or "invalid")
+            await audit.record(self._hr, "intake", "rejected", reason=reason)
             return {"ok": False, "error": INQUIRY_ERRORS.get(reason, INQUIRY_ERRORS["rejected"])}
+        await audit.record(
+            self._hr,
+            "intake",
+            "ok",
+            target=str(result.get("id") or ""),
+            reason="duplicate" if result.get("duplicate") else "",
+        )
         return {k: result[k] for k in ("ok", "id", "duplicate", "grade") if k in result}
 
     async def _inquiry(self, method: str, emp: Employee, **body: Any) -> dict[str, Any]:
@@ -414,23 +458,34 @@ class Tools:
         return {"ok": False, "error": INQUIRY_ERRORS.get(reason, INQUIRY_ERRORS["rejected"])}
 
     async def _as_user(
-        self, token: str, run: Callable[[Employee], Any], tool: str
+        self, token: str, run: Callable[[Employee], Any], tool: str, target: str = ""
     ) -> dict[str, Any]:
+        uid, emp, outcome, why = "", None, "denied", ""
         try:
             uid = session.verify(self._secret, token)
-        except session.SessionError as e:
-            return {"error": str(e)}
-        try:
             emp = await self._hr.employee(uid)
             if emp is None:
-                return {"error": NO_EMPLOYEE}
-            if off := await self._switched_off(emp, tool):
-                return {"employee_name": emp.employee_name, "error": off}
-            result: dict[str, Any] = await run(emp)
-            return result
+                why, result = "no_employee", {"error": NO_EMPLOYEE}
+            elif off := await self._switched_off(emp, tool):
+                why, result = "switched_off", {"employee_name": emp.employee_name, "error": off}
+            else:
+                result = await run(emp)
+                outcome = audit.outcome_of(result)
+        except session.SessionError as e:
+            why, result = "session", {"error": str(e)}
         except httpx.HTTPError as e:
             log.warning("frappe unavailable: %s", type(e).__name__)
-            return {"error": UNAVAILABLE}
+            outcome, why, result = "error", "frappe_unavailable", {"error": UNAVAILABLE}
+        await audit.record(
+            self._hr,
+            tool,
+            outcome,
+            userid=uid,
+            employee=emp.name if emp else "",
+            target=target,
+            reason=why,
+        )
+        return result
 
     async def _switched_off(self, emp: Employee, tool: str) -> str | None:
         """这个功能不能用时返回给员工的提示，能用返回 None。

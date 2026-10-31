@@ -27,5 +27,8 @@ class Settings(BaseSettings):
     # 检索方式：知识库用高质量索引时 hybrid_search；经济索引只支持 keyword_search
     dify_search_method: str = "hybrid_search"
 
+    # 每个员工每分钟最多检索几次（0 表示不限），超了返回 429
+    rate_per_minute: int = Field(default=30, ge=0)
+
     top_k_max: int = Field(default=10, ge=1, le=50)
     http_timeout_seconds: float = 5.0

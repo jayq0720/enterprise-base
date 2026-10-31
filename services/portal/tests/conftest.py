@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from portal.backends import Unavailable
+from portal.backends import TooMany, Unavailable
 from portal.config import Settings
 
 ORIGIN = "https://portal.test"
@@ -58,6 +58,7 @@ class FakeBackends:
         self.searches: list[tuple[str, str]] = []
         self.intakes: list[tuple[str, bytes]] = []
         self.down = False
+        self.limited = False
         self.missing_conversation = False
 
     async def wecom_userid(self, code: str) -> str | None:
@@ -66,6 +67,8 @@ class FakeBackends:
     async def x4(self, name: str, user_id: str, **args: str) -> dict[str, Any]:
         if self.down:
             raise Unavailable
+        if self.limited and name != "profile":
+            raise TooMany
         self.x4_calls.append((name, user_id, args))
         if name == "profile":
             return self.employees.get(user_id, {"ok": False, "error": "未找到"})

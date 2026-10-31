@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from portal.backends import Backends, Unavailable
+from portal.backends import Backends, TooMany, Unavailable
 from portal.config import Settings
 
 
@@ -70,3 +70,14 @@ async def test_backend_errors_raise_unavailable(settings: Settings) -> None:
     api = make(settings, httpx.MockTransport(lambda req: httpx.Response(500, text="boom")))
     with pytest.raises(Unavailable):
         await api.x4("profile", "zhangsan")
+
+
+async def test_rate_limit_passes_through(settings: Settings) -> None:
+    def handle(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"error": "消息太多了"})
+
+    api = make(settings, httpx.MockTransport(handle))
+    with pytest.raises(TooMany):
+        await api.x4("my_duties", "zhangsan")
+    # 进件被 X4 限流时原样告诉网站后台 429，让它稍后重推
+    assert (await api.intake("Bearer x", b"{}"))[0] == 429

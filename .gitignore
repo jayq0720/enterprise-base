@@ -9,3 +9,4 @@ __pycache__/
 .ruff_cache/
 deploy/data/
 deploy/secrets/
+tests/e2e/eval-results/

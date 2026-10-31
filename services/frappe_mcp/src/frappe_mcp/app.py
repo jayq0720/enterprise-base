@@ -10,7 +10,12 @@
   不配就一律 401
 - `GET /healthz`
 
-所有工具都要求传入会话令牌，只查令牌里那个员工自己的数据。
+会话、前台接口按员工限流，进件按分钟和天限流（见 `EB_*RATE*`、`EB_INTAKE_PER_*`）：
+前台和进件超了返回 429；`/v1/session` 超了返回 200 和 `limited: true`、不带令牌，
+工作流据此直接回复员工。
+
+所有工具都要求传入会话令牌，只查令牌里那个员工自己的数据。每次工具调用、确认请假、进件
+都记一条审计（见 audit.py）。
 """
 
 import contextlib
@@ -29,11 +34,14 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from frappe_mcp import session
+from frappe_mcp import audit, session
 from frappe_mcp.config import Settings
 from frappe_mcp.frappe import HR, FrappeHR
+from frappe_mcp.ratelimit import Limiter
 from frappe_mcp.tools import CONFIRM_WORD, Tools
 
+log = logging.getLogger("frappe_mcp")
+TOO_MANY = "消息太多了，请一分钟后再试。"
 SESSION_HINT = "会话令牌，由工作流在调用前填好，不要自己编写或修改。"
 
 
@@ -190,6 +198,20 @@ PORTAL_ARGS = {
 }
 
 
+def _channel(name: str, handler: Any) -> Any:
+    """给审计记录标上入口（前台、进件）；其他路由默认是 Dify。"""
+
+    async def wrapped(request: Request) -> Response:
+        token = audit.CHANNEL.set(name)
+        try:
+            response: Response = await handler(request)
+            return response
+        finally:
+            audit.CHANNEL.reset(token)
+
+    return wrapped
+
+
 def _text(value: object) -> str:
     return value.strip()[:4096] if isinstance(value, str) else ""
 
@@ -203,6 +225,9 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
     client = httpx.AsyncClient(timeout=s.http_timeout_seconds)
     tools = Tools(s, hr or FrappeHR(s, client))
     mcp = build_mcp(tools, s.mcp_allowed_hosts)
+    session_limit = Limiter(s.rate_per_minute)
+    portal_limit = Limiter(s.portal_rate_per_minute)
+    intake_limit = Limiter(s.intake_per_minute, s.intake_per_day)
 
     async def healthz(_: Request) -> Response:
         return JSONResponse({"status": "ok"})
@@ -212,6 +237,10 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
         if fields is None or len(fields[0]) > 128:
             return JSONResponse({"error": "需要 user_id"}, status_code=422)
         user_id = fields[0]
+        if not session_limit.allow(user_id):
+            log.info("rate limited: session")
+            # 返回 200：Dify 的 HTTP 节点把非 2xx 当失败，拿不到正文，工作流就没法告诉员工原因
+            return JSONResponse({"error": TOO_MANY, "limited": True})
         # 不在这里查员工：查不到的人拿到令牌也查不到任何数据
         token = session.issue(secret, user_id, s.session_ttl_seconds)
         return JSONResponse({"session_token": token, "expires_in": s.session_ttl_seconds})
@@ -231,6 +260,9 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
             body, user_id = {}, ""
         if not isinstance(body, dict) or not 0 < len(user_id) <= 128:
             return JSONResponse({"error": "需要 user_id"}, status_code=422)
+        if not portal_limit.allow(user_id):
+            log.info("rate limited: portal")
+            return JSONResponse({"error": TOO_MANY}, status_code=429)
         if name == "profile":
             return JSONResponse(await tools.profile(user_id))
         token = session.issue(secret, user_id, 60)
@@ -254,6 +286,9 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
         return JSONResponse(await method(token, **args))
 
     async def intake(request: Request) -> Response:
+        if not intake_limit.allow("intake"):
+            log.warning("rate limited: intake")
+            return JSONResponse({"ok": False, "error": "询盘太多，请稍后再推"}, status_code=429)
         raw = await request.body()
         try:
             payload = json.loads(raw) if len(raw) <= MAX_INTAKE_BYTES else None
@@ -274,8 +309,8 @@ def create_app(settings: Settings | None = None, hr: HR | None = None) -> ASGIAp
             Route("/healthz", healthz),
             Route("/v1/session", new_session, methods=["POST"]),
             Route("/v1/leave/confirm", confirm_leave, methods=["POST"]),
-            Route(PORTAL + "{name}", portal, methods=["POST"]),
-            Route(INTAKE, intake, methods=["POST"]),
+            Route(PORTAL + "{name}", _channel("portal", portal), methods=["POST"]),
+            Route(INTAKE, _channel("intake", intake), methods=["POST"]),
             Mount("/mcp", app=mcp.streamable_http_app()),
         ],
         lifespan=lifespan,

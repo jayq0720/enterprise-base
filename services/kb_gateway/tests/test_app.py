@@ -37,3 +37,17 @@ def test_search_ok(settings: Settings) -> None:
 def test_healthz(settings: Settings) -> None:
     with client(settings) as c:
         assert c.get("/healthz").json() == {"status": "ok"}
+
+
+def test_rate_limited_per_user(settings: Settings) -> None:
+    with client(settings.model_copy(update={"rate_per_minute": 2})) as c:
+        auth = {"Authorization": f"Bearer {TOKEN}"}
+
+        def ask(uid: str) -> int:
+            body = {"user_id": uid, "query": "请假"}
+            code: int = c.post("/v1/search", json=body, headers=auth).status_code
+            return code
+
+        assert [ask("sales") for _ in range(3)] == [200, 200, 429]
+        # 别人不受影响（查不到岗位的人照常返回空结果，不是 429）
+        assert ask("other") == 200

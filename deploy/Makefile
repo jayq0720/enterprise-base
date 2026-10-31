@@ -39,6 +39,7 @@ verify:
 	$(PYTHON) -m unittest discover -s tests -p 'test_release_state.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_health_services.py'
 	$(PYTHON) -m unittest discover -s tests -p 'test_health_entry.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_ai_report.py'
 build: prepare
 	$(DOCKER) build --platform linux/amd64 -f data/frappe/images/custom/Containerfile --secret id=apps_json,src=apps.lock.json --build-arg FRAPPE_BRANCH=v15.123.1 --build-arg PYTHON_VERSION=3.12.12 --build-arg DEBIAN_BASE=bookworm --build-arg NODE_VERSION=22.20.0 --build-arg INSTALL_CHROMIUM=false --build-arg BUILDKIT_SYNTAX=docker/dockerfile:1.19.0 -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0 data/frappe
 	$(DOCKER) build -f Frappe.Containerfile --label org.opencontainers.image.revision=$(shell git rev-parse HEAD) -t enterprise-base/frappe:15.123.1-hrms15.64.3-wiki3.4.0-eb0.1.0 ../frappe_apps/enterprise_base
@@ -80,6 +81,11 @@ portal: prepare
 	$(HR) --profile hr-assistant up -d --force-recreate --wait --wait-timeout 300 frappe-mcp
 	$(HR) --profile portal up -d --wait --wait-timeout 300 portal
 
+# 标准问题集评测：配置写在 tests/e2e/.env（EB_EVAL_*），见 tests/e2e/README.md“标准问题集”
+.PHONY: eval
+eval:
+	cd ../tests/e2e && $(UV) run python -m e2e.evaluate $(FILES)
+
 .PHONY: health
 health:
 	@$(PYTHON) health.py "$(ENV)"
@@ -101,3 +107,8 @@ release:
 	@$(PYTHON) release_cli.py release --env "$(ENV)" --revision "$(REVISION)"
 rollback:
 	@$(PYTHON) release_cli.py rollback --env "$(ENV)" --record "$(RELEASE_RECORD)" --identity "$(IDENTITY)" $(if $(filter 1,$(RESTORE_DATA)),--restore-data,)
+
+# AI 助手周报：读 Dify 运行记录汇总用量、耗时、费用、兜底、点赞点踩（DAYS 默认 7）
+.PHONY: ai-report
+ai-report:
+	@$(PYTHON) ai_report.py $(or $(DAYS),7)

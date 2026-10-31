@@ -83,6 +83,24 @@ HR 在 Frappe 的“岗位”上勾选这个岗位的员工能用哪些助手功
 - 功能：`profile`（登录时确认在职员工，返回姓名、岗位和六个功能开关，不返回邮箱）、`leave_balance`、`my_leave_applications`、`pending_my_approval`、`my_responsibilities`、`leave_types`、`draft_leave`、`confirm_leave`、`decide`，以及询盘的 `my_inquiries`、`inquiry_detail`（前台是负责人本人在看，**带客户邮箱和电话**）、`follow_up_inquiry`、`inquiry_stats`。参数里不收任何身份字段，内部按 `user_id` 签一个 60 秒的会话令牌再调上面同样的工具，按岗位开关拒绝的规则完全一样。
 - `decide`（通过 / 退回）受“查待我审批”开关控制，调 X2 的 `enterprise_base.wecom.portal_actions.decide`：Frappe 按审批卡片同样的规则重新校验（在职、启用、非接口账号、正是当前环节指定的审批人），再以审批人本人身份走原生 Workflow。不是本人环节的单一律“不在你的待审批里”。
 
+## 限流
+
+进程内按员工计数（只跑一个 uvicorn 进程，重启清零），`0` 表示不限：
+
+| 变量 | 默认 | 超了怎么样 |
+| --- | --- | --- |
+| `EB_RATE_PER_MINUTE` | 20 | `/v1/session` 返回 **200** 和 `{"error": "消息太多了…", "limited": true}`、不带令牌（Dify 的 HTTP 节点把非 2xx 当失败、拿不到正文），HR 助手和询盘助手据此直接回复员工，不调模型 |
+| `EB_PORTAL_RATE_PER_MINUTE` | 60 | 前台接口返回 429，前台显示“操作太频繁” |
+| `EB_INTAKE_PER_MINUTE`、`EB_INTAKE_PER_DAY` | 30、500 | 进件返回 429，网站后台稍后重推；被拒的不建询盘 |
+
+## 审计
+
+每次工具调用（Dify、员工前台）、确认请假和询盘进件都记一条：入口（`dify` / `portal` / `intake`）、工具、结果（`ok` 成功、`rejected` 业务上没通过、`denied` 身份或岗位开关拒绝、`error` HR 系统不可用）、原因代码、企业微信 userid、员工编号、操作对象（请假单号、询盘号）。只记这些标识，不记请假事由、跟进内容、客户联系方式和令牌。
+
+- 写到本服务日志（logger `frappe_mcp.audit`，一行 JSON，`docker logs frappe-mcp` 可查）；
+- 同时调 Frappe 的 `enterprise_base.duties.audit.record` 存进 **EB Audit Log**（HR 经理、系统管理员在后台只读查看，不能改删；只有 X4 接口账号能写）。写 Frappe 失败只记一条警告，不影响员工操作。
+- 保留天数用 Frappe 站点配置 `eb_audit_retention_days`（默认 180，最少 30），每天清理一次。
+
 ## 在 Dify 里接入
 
 1. 工具 → MCP → 添加 MCP 服务：地址 `http://frappe-mcp:8080/mcp/`，请求头 `Authorization: Bearer <EB_MCP_SERVICE_TOKEN>`。
