@@ -29,7 +29,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from portal import session
-from portal.backends import Api, Backends, Unavailable
+from portal.backends import Api, Backends, TooMany, Unavailable
 from portal.config import Settings
 
 STATIC = Path(__file__).with_name("static")
@@ -39,6 +39,7 @@ RANDOM = re.compile(r"[A-Za-z0-9_-]{43}\Z")
 MAX_INTAKE = 32768
 CONVERSATION = re.compile(r"[0-9a-fA-F-]{36}\Z")
 UNAVAILABLE = "系统暂时不可用，请稍后再试。"
+TOO_MANY = "操作太频繁了，请一分钟后再试。"
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
@@ -204,6 +205,8 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
             return uid, cached[0]
         try:
             profile = await api.x4("profile", uid)
+        except TooMany:
+            return JSONResponse({"error": TOO_MANY}, status_code=429)
         except Unavailable:
             return JSONResponse({"error": UNAVAILABLE}, status_code=503)
         if profile.get("ok") is not True:
@@ -223,6 +226,8 @@ def create_app(settings: Settings | None = None, backends: Api | None = None) ->
                 return current
             try:
                 return JSONResponse(await handler(request, *current))
+            except TooMany:
+                return JSONResponse({"error": TOO_MANY}, status_code=429)
             except Unavailable:
                 return JSONResponse({"error": UNAVAILABLE}, status_code=503)
 

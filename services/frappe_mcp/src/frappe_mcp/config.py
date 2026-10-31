@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     frappe_wecom_field: str = "wecom_userid"
     # MCP 防 DNS 重绑定：允许的 Host 头（Dify 访问本服务用的主机名和端口）
     mcp_allowed_hosts: list[str] = ["frappe-mcp:8080", "localhost:*", "127.0.0.1:*"]
+    # 限流（0 表示不限）：每个员工每分钟最多换几次会话令牌（HR 助手、询盘助手每条消息换一次）
+    # 和调几次前台接口；询盘进件每分钟、每天最多收几条，防刷单和刷模型费用
+    rate_per_minute: int = Field(default=20, ge=0)
+    portal_rate_per_minute: int = Field(default=60, ge=0)
+    intake_per_minute: int = Field(default=30, ge=0)
+    intake_per_day: int = Field(default=500, ge=0)
     # 列表类工具最多返回几条
     list_limit: int = Field(default=10, ge=1, le=50)
     http_timeout_seconds: float = 10.0

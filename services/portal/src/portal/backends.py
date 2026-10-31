@@ -19,6 +19,10 @@ class Unavailable(Exception):
     """后端连不上或返回非 200。"""
 
 
+class TooMany(Unavailable):
+    """后端按员工限流，返回了 429。"""
+
+
 class Api(Protocol):
     async def wecom_userid(self, code: str) -> str | None: ...
 
@@ -103,7 +107,7 @@ class Backends:
         except (httpx.HTTPError, ValueError) as e:
             log.warning("backend unavailable: %s", type(e).__name__)
             raise Unavailable from e
-        if not isinstance(data, dict) or resp.status_code not in (200, 401, 422):
+        if not isinstance(data, dict) or resp.status_code not in (200, 401, 422, 429):
             raise Unavailable
         return resp.status_code, data
 
@@ -147,6 +151,8 @@ class Backends:
             if resp.status_code == 404 and "conversation" in resp.text.lower():
                 # Dify 会话不存在（已过期或不是本人的）：让前台开新会话
                 return {"_conversation_missing": True}
+            if resp.status_code == 429:
+                raise TooMany
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as e:

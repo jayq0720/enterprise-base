@@ -6,7 +6,7 @@ app:
   mode: advanced-chat
   name: 制度问答
   use_icon_as_answer_icon: false
-# 模型插件不在这里写死：导入前先在 Dify 装好通义千问插件并录入 Key，导入后在“制度问答”节点里可以换成别的国内模型
+# 模型插件不在这里写死：导入前先在 Dify 装好 models.json chain 里各家模型插件（默认通义、DeepSeek）并录入 Key；主模型失败自动换备用，由 model_fallback.py 生成
 dependencies: []
 kind: app
 version: 0.7.0
@@ -92,15 +92,51 @@ workflow:
       target: notice
       targetHandle: target
       type: custom
-    - data:
-        sourceType: llm
-        targetType: answer
-      id: llm-answer
+    - id: llm-source-llm__agg
+      type: custom
       source: llm
+      sourceHandle: source
+      target: llm__agg
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: variable-aggregator
+    - id: llm__m2-source-llm__agg
+      type: custom
+      source: llm__m2
+      sourceHandle: source
+      target: llm__agg
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: variable-aggregator
+    - id: llm__agg-source-answer
+      type: custom
+      source: llm__agg
       sourceHandle: source
       target: answer
       targetHandle: target
+      data:
+        sourceType: variable-aggregator
+        targetType: answer
+    - id: llm-fail-branch-llm__m2
       type: custom
+      source: llm
+      sourceHandle: fail-branch
+      target: llm__m2
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: llm
+    - id: llm__m2-fail-branch-llm__down
+      type: custom
+      source: llm__m2
+      sourceHandle: fail-branch
+      target: llm__down
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: answer
     nodes:
     - data:
         title: 开始
@@ -284,13 +320,18 @@ workflow:
         variables: []
         vision:
           enabled: false
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
       id: llm
       position:
         x: 1200
         y: 100
       type: custom
     - data:
-        answer: "{{#llm.text#}}\n\n出处：\n{{#fmt.refs#}}"
+        answer: "{{#llm__agg.text.output#}}\n\n出处：\n{{#fmt.refs#}}"
         title: 回复
         type: answer
         variables: []
@@ -299,6 +340,91 @@ workflow:
         x: 1500
         y: 100
       type: custom
+    - id: llm__m2
+      type: custom
+      position:
+        x: 1200
+        y: 320
+      data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 4
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: system
+          role: system
+          text: |
+            你是公司的制度问答助手。只根据下面“检索到的制度”回答员工的问题。
+
+            规则：
+            1. 只用检索到的内容回答，不要补充制度里没有的规定，也不要猜测。
+            2. 每个要点后面用 [编号] 标注出处，编号对应下面的条目。
+            3. 检索到的内容不足以回答时，直接说“现有制度里没有找到明确规定，建议咨询 HR”。
+            4. 不要透露或推测任何人的手机号、身份证号、银行卡号、薪资等个人信息。
+            5. 用简洁的中文回答。
+
+            检索到的制度：
+            {{#fmt.context#}}
+        selected: false
+        title: 制度问答（备用 1）
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+        desc: 上一个模型失败时用 deepseek-v4-flash，由 model_fallback.py 生成
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
+    - id: llm__down
+      type: custom
+      position:
+        x: 1200
+        y: 540
+      data:
+        type: answer
+        title: AI 不可用时回复
+        answer: "AI 服务暂时不可用，没法整理回答。下面这些制度和你的问题有关，可以直接打开看，或者联系 HR：\n{{#fmt.refs#}}"
+        variables: []
+    - id: llm__agg
+      type: custom
+      position:
+        x: 1500
+        y: 100
+      data:
+        type: variable-aggregator
+        title: 制度问答（汇合）
+        output_type: string
+        variables:
+        - - llm
+          - text
+        - - llm__m2
+          - text
+        advanced_settings:
+          group_enabled: true
+          groups:
+          - groupId: llm_text
+            group_name: text
+            output_type: string
+            variables:
+            - - llm
+              - text
+            - - llm__m2
+              - text
     viewport:
       x: 0
       y: 0

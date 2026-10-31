@@ -1,0 +1,62 @@
+{
+  "_说明": "Dify 应用里的模型怎么接、坏了怎么兜底。chain 是主模型和备用模型，按顺序试；chain 里的每家都必须在 Dify 装好插件、录好 Key，少一家整个应用会直接报错（Dify 在对话开始时检查所有模型节点）。改完在仓库根目录运行 `uv run --with ruamel.yaml python config/dify/model_fallback.py` 重新生成三个 DSL，见 README.md“模型和兜底”。Key 只在 Dify 后台录入，这里不写。",
+  "providers": {
+    "langgenius/tongyi/tongyi": "通义千问（阿里云百炼）",
+    "langgenius/deepseek/deepseek": "DeepSeek",
+    "langgenius/zhipuai/zhipuai": "智谱 GLM",
+    "langgenius/volcengine_maas/volcengine_maas": "豆包（火山方舟，要填自己账号的接入点）",
+    "langgenius/moonshot/moonshot": "Kimi（月之暗面）",
+    "langgenius/minimax/minimax": "MiniMax",
+    "langgenius/hunyuan/hunyuan": "腾讯混元",
+    "langgenius/wenxin/wenxin": "百度文心（千帆）",
+    "langgenius/siliconflow/siliconflow": "硅基流动",
+    "langgenius/baichuan/baichuan": "百川",
+    "langgenius/stepfun/stepfun": "阶跃星辰",
+    "langgenius/huaweicloud_maas/huaweicloud_maas": "华为云 MaaS",
+    "langgenius/openai_api_compatible/openai_api_compatible": "OpenAI 兼容接口（自建 vLLM 或其他国内厂商；只能填国内地址）",
+    "langgenius/xinference/xinference": "Xinference（自建）",
+    "langgenius/ollama/ollama": "Ollama（自建）"
+  },
+  "chain": [
+    {"provider": "langgenius/tongyi/tongyi", "name": "qwen-plus"},
+    {"provider": "langgenius/deepseek/deepseek", "name": "deepseek-v4-flash"}
+  ],
+  "retry": {"max_retries": 1, "retry_interval": 1000},
+  "fallbacks": {
+    "hr-assistant": {
+      "intent": {
+        "rules": [
+          ["policy", ["规定", "制度", "政策", "流程", "怎么算", "标准", "福利"]],
+          ["approve", ["待我审批", "要我审批", "我审批", "待审批", "要我批", "需要我批"]],
+          ["my_leaves", ["批了没", "批了吗", "审批进度", "我的请假", "请假进度", "请假记录", "请假状态", "申请状态"]],
+          ["balance", ["余额", "还有几天", "剩几天", "剩余", "还剩", "几天假"]],
+          ["duties", ["职责", "负责什么", "负责哪些", "岗位"]],
+          ["apply", ["请.{0,8}假", "调休", "休.{0,4}假"]]
+        ],
+        "default": "policy"
+      },
+      "p_llm": {"answer": "AI 服务暂时不可用，没法整理回答。下面这些制度和你的问题有关，可以直接打开看，或者联系 HR：\n{{#p_fmt.refs#}}"},
+      "extract": {"answer": "AI 服务暂时不可用，没法识别请假信息。查余额、查请假进度、查待我审批、查岗位职责还能用；请假请稍后再试，或在员工前台提交。"}
+    },
+    "policy-qa": {
+      "llm": {"answer": "AI 服务暂时不可用，没法整理回答。下面这些制度和你的问题有关，可以直接打开看，或者联系 HR：\n{{#fmt.refs#}}"}
+    },
+    "inquiry-assistant": {
+      "intent": {
+        "rules": [
+          ["follow", ["已回复", "有意向", "无效", "记跟进", "记一笔", "改状态", "改成"]],
+          ["draft", ["草稿", "回复", "怎么回", "回信"]],
+          ["stats", ["统计", "多少", "漏斗", "转化", "时效", "渠道"]],
+          ["detail", ["详情", "客户问了", "跟进记录", "CRM-LEAD-"]],
+          ["list", ["询盘", "列表", "待跟进"]]
+        ],
+        "default": "other"
+      },
+      "x_detail": {"answer": "AI 服务暂时不可用，没法识别询盘号。可以在员工前台的询盘页面直接查看。"},
+      "x_draft": {"answer": "AI 服务暂时不可用，没法写草稿。可以在员工前台的询盘页面先看客户原文。"},
+      "x_follow": {"answer": "AI 服务暂时不可用，没法记跟进。可以在员工前台的询盘页面直接记。"},
+      "x_stats": {"answer": "AI 服务暂时不可用，没法统计。可以在员工前台的询盘统计页查看。"},
+      "llm_draft": {"answer": "AI 服务暂时不可用，没法写草稿。可以先参考这些资料自己回复：\n{{#k_fmt.refs#}}"}
+    }
+  }
+}
