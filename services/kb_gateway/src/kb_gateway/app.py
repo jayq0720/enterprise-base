@@ -12,6 +12,7 @@ from kb_gateway.config import Settings
 from kb_gateway.dify import DifyKnowledge, Knowledge
 from kb_gateway.directory import Directory, FrappeDirectory
 from kb_gateway.models import SearchRequest, SearchResponse
+from kb_gateway.ratelimit import Limiter
 from kb_gateway.service import SearchService
 
 
@@ -34,6 +35,7 @@ def create_app(
 
     app = FastAPI(title="kb-gateway", version="0.1.0", lifespan=lifespan)
     expected = s.kb_service_token.get_secret_value().encode()
+    limiter = Limiter(s.rate_per_minute)
 
     def check_token(authorization: Annotated[str | None, Header()] = None) -> None:
         scheme, _, token = (authorization or "").partition(" ")
@@ -46,6 +48,8 @@ def create_app(
 
     @app.post("/v1/search", dependencies=[Depends(check_token)])
     async def search(req: SearchRequest, request: Request) -> SearchResponse:
+        if not limiter.allow(req.user_id):
+            raise HTTPException(status_code=429, detail="消息太多了，请一分钟后再试。")
         service: SearchService = request.app.state.service
         return await service.search(req)
 

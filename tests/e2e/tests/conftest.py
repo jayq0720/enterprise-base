@@ -1,4 +1,4 @@
-"""没配置测试环境（EB_E2E_FRAPPE_URL 为空）时整套跳过，CI 里只做静态检查。"""
+"""没配置测试环境（EB_E2E_FRAPPE_URL 为空）时整套跳过（test_dsl.py 除外），CI 里只做静态检查。"""
 
 import datetime
 import os
@@ -18,7 +18,9 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     if not os.environ.get("EB_E2E_FRAPPE_URL"):
         skip = pytest.mark.skip(reason="未配置测试环境（EB_E2E_*），跳过端到端测试")
         for item in items:
-            item.add_marker(skip)
+            # 离线检查（DSL 结构）不需要测试环境
+            if item.path.name != "test_dsl.py":
+                item.add_marker(skip)
 
 
 @pytest.fixture(scope="session")

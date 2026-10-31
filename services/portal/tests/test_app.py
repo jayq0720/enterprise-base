@@ -154,6 +154,15 @@ def test_backend_down_is_503(settings: Settings) -> None:
         assert resp.status_code == 503 and "暂时不可用" in resp.json()["error"]
 
 
+def test_backend_rate_limit_is_429(settings: Settings) -> None:
+    fake = FakeBackends()
+    with client(settings, fake) as c:
+        login(c)
+        fake.limited = True
+        resp = c.get("/api/duties", headers=API)
+        assert resp.status_code == 429 and "一分钟后" in resp.json()["error"]
+
+
 def test_chat_and_search(settings: Settings) -> None:
     fake = FakeBackends()
     with client(settings, fake) as c:

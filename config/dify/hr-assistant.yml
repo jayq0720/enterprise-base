@@ -1,5 +1,5 @@
 # HR 助手（Dify Chatflow）。由 P2-C2 生成，说明见同目录 README.md。
-# 模型插件和 MCP 服务不在这里写死：导入前先装好通义千问插件并录入 Key，
+# 模型插件和 MCP 服务不在这里写死：导入前先装好 models.json chain 里各家模型插件（默认通义、DeepSeek）并录入 Key，
 # 在“工具 → MCP”里添加 X4（服务标识填 eb-hr），导入后在“环境变量”里填地址和 Token。
 app:
   description: 企业微信里的 HR 助手：问制度（按岗位检索，附出处）、查假期和请假进度、查待我审批、查岗位职责、发起请假（员工确认后才提交）。
@@ -286,13 +286,23 @@ workflow:
 
 
           def main(body: str) -> dict:
-              """取出会话令牌；顺便给出北京时间今天的日期，供起草请假时换算“明天”“下周一”。"""
+              """取出会话令牌；拿不到时（X4 限流或不可用）给出要回复的话，不再往下走、不调模型。
+              顺便给出北京时间今天的日期，供起草请假时换算“明天”“下周一”。"""
               today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
               try:
-                  token = json.loads(body).get("session_token", "")
+                  data = json.loads(body)
               except ValueError:
-                  token = ""
-              return {"token": token, "today": today.isoformat() + " 星期" + "一二三四五六日"[today.weekday()]}
+                  data = {}
+              token = data.get("session_token", "") if isinstance(data, dict) else ""
+              notice = ""
+              if not token:
+                  notice = (data.get("error") if isinstance(data, dict) and data.get("limited") else "") or "系统暂时不可用，请稍后再试。"
+              return {
+                  "token": token,
+                  "stop": 0 if token else 1,
+                  "notice": notice,
+                  "today": today.isoformat() + " 星期" + "一二三四五六日"[today.weekday()],
+              }
         variables:
         - variable: body
           value_selector:
@@ -300,6 +310,12 @@ workflow:
           - body
         outputs:
           token:
+            type: string
+            children: null
+          stop:
+            type: number
+            children: null
+          notice:
             type: string
             children: null
           today:
@@ -349,6 +365,11 @@ workflow:
             assistant: ''
         vision:
           enabled: false
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
     - data:
         authorization:
           config: null
@@ -519,6 +540,11 @@ workflow:
         variables: []
         vision:
           enabled: false
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
       id: p_llm
       position:
         x: 2400
@@ -526,7 +552,7 @@ workflow:
       type: custom
     - data:
         answer: |-
-          {{#p_llm.text#}}
+          {{#p_llm__agg.text.output#}}
 
           出处：
           {{#p_fmt.refs#}}
@@ -864,6 +890,11 @@ workflow:
             assistant: ''
         vision:
           enabled: false
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
     - id: t_draft
       type: custom
       position:
@@ -884,16 +915,16 @@ workflow:
             value: '{{#token.token#}}'
           leave_type:
             type: mixed
-            value: '{{#extract.leave_type#}}'
+            value: '{{#extract__agg.leave_type.output#}}'
           from_date:
             type: mixed
-            value: '{{#extract.from_date#}}'
+            value: '{{#extract__agg.from_date.output#}}'
           to_date:
             type: mixed
-            value: '{{#extract.to_date#}}'
+            value: '{{#extract__agg.to_date.output#}}'
           reason:
             type: mixed
-            value: '{{#extract.reason#}}'
+            value: '{{#extract__agg.reason.output#}}'
         error_strategy: default-value
         default_value:
         - key: text
@@ -985,6 +1016,377 @@ workflow:
           · 查自己的岗位职责
           · 发起请假（会先给你核对，回复“确认请假”才提交）
         variables: []
+    - id: limit
+      type: custom
+      position:
+        x: 1050
+        y: 50
+      data:
+        type: if-else
+        title: 拿到会话令牌了吗
+        cases:
+        - case_id: 'true'
+          id: 'true'
+          logical_operator: and
+          conditions:
+          - id: lim
+            variable_selector:
+            - token
+            - stop
+            comparison_operator: '='
+            value: '1'
+            varType: number
+    - id: a_limited
+      type: custom
+      position:
+        x: 1350
+        y: 50
+      data:
+        type: answer
+        title: 回复
+        answer: '{{#token.notice#}}'
+        variables: []
+    - id: intent__m2
+      type: custom
+      position:
+        x: 1200
+        y: 520
+      data:
+        type: question-classifier
+        title: 判断意图（备用 1）
+        query_variable_selector:
+        - sys
+        - query
+        model:
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        classes:
+        - id: policy
+          name: 问公司制度、规定、流程、福利政策
+        - id: balance
+          name: 查自己的假期余额、还有几天假
+        - id: my_leaves
+          name: 查自己的请假申请、请假批了没有
+        - id: approve
+          name: 查等自己审批的请假、有什么要我审批
+        - id: duties
+          name: 查自己的岗位职责、我负责哪些工作
+        - id: apply
+          name: 要请假、帮我请假、发起请假申请
+        - id: other
+          name: 其他，或者和以上都无关
+        instruction: 员工在企业微信里和 HR 助手对话，判断这句话属于哪一类。
+        instructions: ''
+        memory:
+          window:
+            enabled: true
+            size: 4
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            user: ''
+            assistant: ''
+        vision:
+          enabled: false
+        desc: 上一个模型失败时用 deepseek-v4-flash，由 model_fallback.py 生成
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
+    - id: intent__kw
+      type: custom
+      position:
+        x: 1200
+        y: 740
+      data:
+        type: code
+        title: 判断意图（关键词兜底）
+        desc: 模型都不可用时按关键词判断，由 model_fallback.py 生成
+        code_language: python3
+        code: "import json\nimport re\n\nRULES = json.loads('[[\"policy\", [\"规定\", \"制度\", \"政策\", \"流程\", \"怎么算\", \"标准\", \"福利\"]], [\"approve\", [\"待我审批\", \"要我审批\", \"我审批\", \"待审批\", \"要我批\", \"需要我批\"]], [\"my_leaves\", [\"批了没\", \"批了吗\", \"审批进度\", \"我的请假\", \"请假进度\", \"请假记录\", \"请假状态\", \"申请状态\"]], [\"balance\", [\"余额\", \"还有几天\", \"剩几天\", \"剩余\", \"还剩\", \"几天假\"]], [\"duties\", [\"职责\", \"负责什么\", \"负责哪些\", \"岗位\"]], [\"apply\", [\"请.{0,8}假\", \"调休\", \"休.{0,4}假\"]]]')\n\n\ndef main(query: str) -> dict:\n    \"\"\"模型都不可用时按关键词判断意图（按顺序，先命中先用）。\"\"\"\n    q = query or \"\"\n    for intent, words in RULES:\n        if any(re.search(w, q) for w in words):\n            return {\"intent\": intent}\n    return {\"intent\": 'policy'}\n"
+        variables:
+        - variable: query
+          value_selector:
+          - sys
+          - query
+        outputs:
+          intent:
+            type: string
+            children: null
+    - id: intent__kwif
+      type: custom
+      position:
+        x: 1500
+        y: 740
+      data:
+        type: if-else
+        title: 按关键词分流
+        cases:
+        - case_id: balance
+          id: balance
+          logical_operator: and
+          conditions:
+          - id: kw_balance
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: balance
+            varType: string
+        - case_id: my_leaves
+          id: my_leaves
+          logical_operator: and
+          conditions:
+          - id: kw_my_leaves
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: my_leaves
+            varType: string
+        - case_id: approve
+          id: approve
+          logical_operator: and
+          conditions:
+          - id: kw_approve
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: approve
+            varType: string
+        - case_id: duties
+          id: duties
+          logical_operator: and
+          conditions:
+          - id: kw_duties
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: duties
+            varType: string
+        - case_id: apply
+          id: apply
+          logical_operator: and
+          conditions:
+          - id: kw_apply
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: apply
+            varType: string
+        - case_id: other
+          id: other
+          logical_operator: and
+          conditions:
+          - id: kw_other
+            variable_selector:
+            - intent__kw
+            - intent
+            comparison_operator: is
+            value: other
+            varType: string
+    - id: p_llm__m2
+      type: custom
+      position:
+        x: 2400
+        y: 920
+      data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 4
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: system
+          role: system
+          text: |
+            你是公司的制度问答助手。只根据下面“检索到的制度”回答员工的问题。
+
+            规则：
+            1. 只用检索到的内容回答，不要补充制度里没有的规定，也不要猜测。
+            2. 每个要点后面用 [编号] 标注出处，编号对应下面的条目。
+            3. 检索到的内容不足以回答时，直接说“现有制度里没有找到明确规定，建议咨询 HR”。
+            4. 不要透露或推测任何人的手机号、身份证号、银行卡号、薪资等个人信息。
+            5. 用简洁的中文回答。
+
+            检索到的制度：
+            {{#p_fmt.context#}}
+        selected: false
+        title: 制度问答（备用 1）
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+        desc: 上一个模型失败时用 deepseek-v4-flash，由 model_fallback.py 生成
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
+    - id: p_llm__down
+      type: custom
+      position:
+        x: 2400
+        y: 1140
+      data:
+        type: answer
+        title: AI 不可用时回复
+        answer: "AI 服务暂时不可用，没法整理回答。下面这些制度和你的问题有关，可以直接打开看，或者联系 HR：\n{{#p_fmt.refs#}}"
+        variables: []
+    - id: p_llm__agg
+      type: custom
+      position:
+        x: 2700
+        y: 700
+      data:
+        type: variable-aggregator
+        title: 制度问答（汇合）
+        output_type: string
+        variables:
+        - - p_llm
+          - text
+        - - p_llm__m2
+          - text
+        advanced_settings:
+          group_enabled: true
+          groups:
+          - groupId: p_llm_text
+            group_name: text
+            output_type: string
+            variables:
+            - - p_llm
+              - text
+            - - p_llm__m2
+              - text
+    - id: extract__m2
+      type: custom
+      position:
+        x: 1500
+        y: 1920
+      data:
+        type: parameter-extractor
+        title: 提取请假信息（备用 1）
+        model:
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        query:
+        - sys
+        - query
+        reasoning_mode: prompt
+        parameters:
+        - name: leave_type
+          type: string
+          required: true
+          description: 假期类型名称，例如 年假、病假、事假
+        - name: from_date
+          type: string
+          required: true
+          description: 开始日期，YYYY-MM-DD
+        - name: to_date
+          type: string
+          required: true
+          description: 结束日期，YYYY-MM-DD；只请一天时和开始日期相同
+        - name: reason
+          type: string
+          required: false
+          description: 请假事由，没说就留空
+        instruction: 今天是 {{#token.today#}}。把“明天”“下周一”这类说法换算成具体日期。只提取员工本人说的内容，不要替他编造。
+        memory:
+          window:
+            enabled: true
+            size: 4
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            user: ''
+            assistant: ''
+        vision:
+          enabled: false
+        desc: 上一个模型失败时用 deepseek-v4-flash，由 model_fallback.py 生成
+        error_strategy: fail-branch
+        retry_config:
+          retry_enabled: true
+          max_retries: 1
+          retry_interval: 1000
+    - id: extract__down
+      type: custom
+      position:
+        x: 1500
+        y: 2140
+      data:
+        type: answer
+        title: AI 不可用时回复
+        answer: AI 服务暂时不可用，没法识别请假信息。查余额、查请假进度、查待我审批、查岗位职责还能用；请假请稍后再试，或在员工前台提交。
+        variables: []
+    - id: extract__agg
+      type: custom
+      position:
+        x: 1800
+        y: 1700
+      data:
+        type: variable-aggregator
+        title: 提取请假信息（汇合）
+        output_type: string
+        variables:
+        - - extract
+          - leave_type
+        - - extract__m2
+          - leave_type
+        advanced_settings:
+          group_enabled: true
+          groups:
+          - groupId: extract_leave_type
+            group_name: leave_type
+            output_type: string
+            variables:
+            - - extract
+              - leave_type
+            - - extract__m2
+              - leave_type
+          - groupId: extract_from_date
+            group_name: from_date
+            output_type: string
+            variables:
+            - - extract
+              - from_date
+            - - extract__m2
+              - from_date
+          - groupId: extract_to_date
+            group_name: to_date
+            output_type: string
+            variables:
+            - - extract
+              - to_date
+            - - extract__m2
+              - to_date
+          - groupId: extract_reason
+            group_name: reason
+            output_type: string
+            variables:
+            - - extract
+              - reason
+            - - extract__m2
+              - reason
     edges:
     - data:
         sourceType: if-else
@@ -1029,15 +1431,6 @@ workflow:
       source: p_check
       sourceHandle: 'false'
       target: p_notice
-      targetHandle: target
-      type: custom
-    - data:
-        sourceType: llm
-        targetType: answer
-      id: p_llm-source-p_answer
-      source: p_llm
-      sourceHandle: source
-      target: p_answer
       targetHandle: target
       type: custom
     - data:
@@ -1167,15 +1560,6 @@ workflow:
       targetHandle: target
       type: custom
     - data:
-        sourceType: parameter-extractor
-        targetType: tool
-      id: extract-source-t_draft
-      source: extract
-      sourceHandle: source
-      target: t_draft
-      targetHandle: target
-      type: custom
-    - data:
         sourceType: tool
         targetType: code
       id: t_draft-source-f_draft
@@ -1274,15 +1658,276 @@ workflow:
       target: token
       targetHandle: target
       type: custom
-    - data:
-        sourceType: code
-        targetType: question-classifier
-      id: token-source-intent
+    - id: token-source-limit
+      type: custom
       source: token
       sourceHandle: source
+      target: limit
+      targetHandle: target
+      data:
+        sourceType: code
+        targetType: if-else
+    - id: limit-true-a_limited
+      type: custom
+      source: limit
+      sourceHandle: 'true'
+      target: a_limited
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: answer
+    - id: limit-false-intent
+      type: custom
+      source: limit
+      sourceHandle: 'false'
       target: intent
       targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: question-classifier
+    - id: intent__kw-source-intent__kwif
       type: custom
+      source: intent__kw
+      sourceHandle: source
+      target: intent__kwif
+      targetHandle: target
+      data:
+        sourceType: code
+        targetType: if-else
+    - id: intent__kwif-false-p_x3
+      type: custom
+      source: intent__kwif
+      sourceHandle: 'false'
+      target: p_x3
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: http-request
+    - id: intent__kwif-balance-t_balance
+      type: custom
+      source: intent__kwif
+      sourceHandle: balance
+      target: t_balance
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: tool
+    - id: intent__kwif-my_leaves-t_my_leaves
+      type: custom
+      source: intent__kwif
+      sourceHandle: my_leaves
+      target: t_my_leaves
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: tool
+    - id: intent__kwif-approve-t_approve
+      type: custom
+      source: intent__kwif
+      sourceHandle: approve
+      target: t_approve
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: tool
+    - id: intent__kwif-duties-t_duties
+      type: custom
+      source: intent__kwif
+      sourceHandle: duties
+      target: t_duties
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: tool
+    - id: intent__kwif-apply-extract
+      type: custom
+      source: intent__kwif
+      sourceHandle: apply
+      target: extract
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: parameter-extractor
+    - id: intent__kwif-other-a_other
+      type: custom
+      source: intent__kwif
+      sourceHandle: other
+      target: a_other
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: answer
+    - id: intent__m2-policy-p_x3
+      type: custom
+      source: intent__m2
+      sourceHandle: policy
+      target: p_x3
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: http-request
+    - id: intent__m2-balance-t_balance
+      type: custom
+      source: intent__m2
+      sourceHandle: balance
+      target: t_balance
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: tool
+    - id: intent__m2-my_leaves-t_my_leaves
+      type: custom
+      source: intent__m2
+      sourceHandle: my_leaves
+      target: t_my_leaves
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: tool
+    - id: intent__m2-approve-t_approve
+      type: custom
+      source: intent__m2
+      sourceHandle: approve
+      target: t_approve
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: tool
+    - id: intent__m2-duties-t_duties
+      type: custom
+      source: intent__m2
+      sourceHandle: duties
+      target: t_duties
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: tool
+    - id: intent__m2-apply-extract
+      type: custom
+      source: intent__m2
+      sourceHandle: apply
+      target: extract
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: parameter-extractor
+    - id: intent__m2-other-a_other
+      type: custom
+      source: intent__m2
+      sourceHandle: other
+      target: a_other
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: answer
+    - id: intent-fail-branch-intent__m2
+      type: custom
+      source: intent
+      sourceHandle: fail-branch
+      target: intent__m2
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: question-classifier
+    - id: intent__m2-fail-branch-intent__kw
+      type: custom
+      source: intent__m2
+      sourceHandle: fail-branch
+      target: intent__kw
+      targetHandle: target
+      data:
+        sourceType: question-classifier
+        targetType: code
+    - id: p_llm-source-p_llm__agg
+      type: custom
+      source: p_llm
+      sourceHandle: source
+      target: p_llm__agg
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: variable-aggregator
+    - id: p_llm__m2-source-p_llm__agg
+      type: custom
+      source: p_llm__m2
+      sourceHandle: source
+      target: p_llm__agg
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: variable-aggregator
+    - id: p_llm__agg-source-p_answer
+      type: custom
+      source: p_llm__agg
+      sourceHandle: source
+      target: p_answer
+      targetHandle: target
+      data:
+        sourceType: variable-aggregator
+        targetType: answer
+    - id: p_llm-fail-branch-p_llm__m2
+      type: custom
+      source: p_llm
+      sourceHandle: fail-branch
+      target: p_llm__m2
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: llm
+    - id: p_llm__m2-fail-branch-p_llm__down
+      type: custom
+      source: p_llm__m2
+      sourceHandle: fail-branch
+      target: p_llm__down
+      targetHandle: target
+      data:
+        sourceType: llm
+        targetType: answer
+    - id: extract-source-extract__agg
+      type: custom
+      source: extract
+      sourceHandle: source
+      target: extract__agg
+      targetHandle: target
+      data:
+        sourceType: parameter-extractor
+        targetType: variable-aggregator
+    - id: extract__m2-source-extract__agg
+      type: custom
+      source: extract__m2
+      sourceHandle: source
+      target: extract__agg
+      targetHandle: target
+      data:
+        sourceType: parameter-extractor
+        targetType: variable-aggregator
+    - id: extract__agg-source-t_draft
+      type: custom
+      source: extract__agg
+      sourceHandle: source
+      target: t_draft
+      targetHandle: target
+      data:
+        sourceType: variable-aggregator
+        targetType: tool
+    - id: extract-fail-branch-extract__m2
+      type: custom
+      source: extract
+      sourceHandle: fail-branch
+      target: extract__m2
+      targetHandle: target
+      data:
+        sourceType: parameter-extractor
+        targetType: parameter-extractor
+    - id: extract__m2-fail-branch-extract__down
+      type: custom
+      source: extract__m2
+      sourceHandle: fail-branch
+      target: extract__down
+      targetHandle: target
+      data:
+        sourceType: parameter-extractor
+        targetType: answer
     viewport:
       x: 0
       y: 0
