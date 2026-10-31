@@ -127,6 +127,8 @@ from enterprise_base.marketing.fields import lead_fields as _lead_fields  # noqa
 # 营销：询盘中心（ERPNext Lead 上的字段和钩子）、营销助手岗位开关
 after_sync.append("enterprise_base.marketing.inquiry.configure")
 after_migrate.append("enterprise_base.marketing.inquiry.configure")
+scheduler_events["hourly"].append("enterprise_base.marketing.alerts.overdue")
+doc_events["Communication"] = {"after_insert": "enterprise_base.marketing.email.on_communication"}
 doc_events["Lead"] = {
     "before_insert": "enterprise_base.marketing.inquiry.before_insert",
     "validate": "enterprise_base.marketing.inquiry.validate",

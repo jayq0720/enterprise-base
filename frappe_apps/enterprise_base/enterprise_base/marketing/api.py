@@ -14,6 +14,7 @@ import json
 import frappe
 from frappe.utils import add_days, cint, now_datetime, strip_html
 
+from enterprise_base.marketing.alerts import assigned
 from enterprise_base.marketing.fields import CHANNELS
 from enterprise_base.marketing.inquiry import OPEN_STATUSES, pick_owner
 from enterprise_base.wecom.card_actions import actor
@@ -143,6 +144,8 @@ def intake(data=None):
     # 国家、语言没给的不沿用系统默认值（默认国家会被当成客户所在国）
     cleared = {f: None for f in ("country", "language") if f not in given}
     doc.db_set({"lead_owner": owner, **cleared}, update_modified=False)
+    if owner:
+        assigned(doc.name)
     frappe.logger("marketing").info(
         "inquiry=%s channel=%s grade=%s assigned=%s",
         doc.name,
@@ -318,9 +321,78 @@ def stats(userid="", days=30):
         "ok": True,
         "days": days,
         "total": total,
+        "funnel": _funnel(since),
+        "currency": _currency(since),
         "by_channel": group("eb_channel"),
         "by_grade": group("eb_grade"),
         "by_ai_engine": group("eb_ai_engine", "非 AI 来源"),
         "by_status": group("status"),
         "avg_first_response_minutes": round(float(response), 1) if response is not None else None,
     }
+
+
+def _currency(since):
+    """成交额是订单所属公司的本位币金额相加：只有一种币种时给出币种，混了多种时如实标明。"""
+    found = frappe.db.sql_list(
+        """select distinct co.default_currency from `tabSales Order` so
+        join `tabCompany` co on co.name = so.company
+        join `tabCustomer` c on c.name = so.customer
+        join `tabLead` l on l.name = c.lead_name
+        where so.docstatus = 1 and l.creation >= %s""",
+        since,
+    )
+    if len(found) > 1:
+        return "（多币种合计）"
+    if found:
+        return found[0]
+    company = frappe.db.get_default("company") or frappe.db.get_value("Company", {}, "name")
+    return (company and frappe.db.get_value("Company", company, "default_currency")) or ""
+
+
+# 进了商机阶段的线索状态（ERPNext 建商机、报价、转客户时自动改）
+OPPORTUNITY_STATUSES = ("Opportunity", "Quotation", "Lost Quotation", "Converted")
+
+
+def _funnel(since):
+    """按渠道、AI 来源看转化：询盘、有效、已跟进、转商机、成交（有已提交销售订单）、成交额。
+
+    成交额按询盘转成的客户（客户上的“线索”）汇总已提交销售订单的本位币金额，
+    只统计这段时间新进的询盘，订单时间不限。
+    """
+    rows = frappe.db.sql(
+        f"""select ifnull(l.eb_channel, '') as channel, ifnull(l.eb_ai_engine, '') as engine,
+            count(*) as total,
+            sum(ifnull(l.eb_grade, '') != '无效') as valid,
+            sum(l.eb_first_response_at is not null) as responded,
+            sum(l.status in ({", ".join(["%s"] * len(OPPORTUNITY_STATUSES))})) as opportunity,
+            sum(o.amount is not null) as won,
+            ifnull(sum(o.amount), 0) as revenue
+        from `tabLead` l
+        left join (
+            select c.lead_name as lead, sum(so.base_grand_total) as amount
+            from `tabCustomer` c join `tabSales Order` so
+                on so.customer = c.name and so.docstatus = 1
+            where ifnull(c.lead_name, '') != '' group by c.lead_name
+        ) o on o.lead = l.name
+        where l.creation >= %s
+        group by channel, engine""",
+        (*OPPORTUNITY_STATUSES, since),
+        as_dict=True,
+    )
+    keys = ("total", "valid", "responded", "opportunity", "won", "revenue")
+    total: dict[str, float] = dict.fromkeys(keys, 0)
+    groups: dict[str, dict[str, dict[str, float]]] = {"by_channel": {}, "by_ai_engine": {}}
+    for row in rows:
+        for group, name in (
+            ("by_channel", row.channel or "（未填）"),
+            ("by_ai_engine", row.engine or "非 AI 来源"),
+        ):
+            bucket = groups[group].setdefault(name, dict.fromkeys(keys, 0))
+            for key in keys:
+                bucket[key] += row[key] or 0
+        for key in keys:
+            total[key] += row[key] or 0
+    for bucket in (total, *groups["by_channel"].values(), *groups["by_ai_engine"].values()):
+        for key in keys:
+            bucket[key] = round(float(bucket[key]), 2) if key == "revenue" else int(bucket[key])
+    return {"all": total, **groups}

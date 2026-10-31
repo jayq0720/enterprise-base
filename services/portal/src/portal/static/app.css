@@ -91,6 +91,7 @@ input, select { font: inherit; padding: 7px 10px; border: 1px solid var(--line);
 .quote { white-space: pre-wrap; background: var(--bg); padding: 8px 12px; border-radius: 6px; }
 .notes { padding-left: 18px; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: start; }
+.stats .wide { grid-column: 1 / -1; overflow-x: auto; display: block; }
 
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
